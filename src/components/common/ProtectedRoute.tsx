@@ -1,6 +1,6 @@
 
 import { ReactNode, useEffect, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import { toast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { isAuthenticated, user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [authTimeout, setAuthTimeout] = useState(false);
   const [processingAuth, setProcessingAuth] = useState(false);
   const [processingAttempts, setProcessingAttempts] = useState(0);
@@ -44,6 +45,11 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
         } catch (error) {
           console.error("Error processing auth hash:", error);
           setProcessingAttempts(prev => prev + 1);
+          toast({
+            variant: "destructive",
+            title: "Authentication error",
+            description: "Failed to complete authentication. Please try again.",
+          });
         } finally {
           setProcessingAuth(false);
         }
@@ -51,7 +57,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     };
 
     handleAuthHash();
-  }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts]);
+  }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts, navigate]);
 
   // Add timeout for authentication loading
   useEffect(() => {
@@ -70,7 +76,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             description: "There was a problem processing your login. Please try again.",
           });
         }
-      }, 10000); // 10 second timeout
+      }, 7000); // 7 second timeout (reduced from 10 seconds)
     } else {
       setAuthTimeout(false);
     }
@@ -84,6 +90,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const retryAuth = async () => {
     if (hasAuthHash) {
       setProcessingAuth(true);
+      setProcessingAttempts(prev => prev + 1);
       try {
         const session = await processAuthHash();
         if (!session) {
@@ -92,13 +99,29 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             title: "Authentication failed",
             description: "Unable to complete authentication. Please try logging in again.",
           });
+        } else {
+          // Session was set successfully, the auth state listener should handle the update
+          console.log("Authentication retry successful");
         }
       } catch (error) {
         console.error("Retry auth error:", error);
+        toast({
+          variant: "destructive",
+          title: "Authentication error",
+          description: "Failed to complete authentication. Please try again.",
+        });
       } finally {
         setProcessingAuth(false);
       }
     }
+  };
+
+  const goToLogin = () => {
+    // Clear the URL hash before navigating
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    navigate('/login');
   };
 
   if (isLoading || hasAuthHash || processingAuth) {
@@ -123,12 +146,14 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             <button 
               onClick={retryAuth} 
               className="mt-2 px-4 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary/90 transition-colors"
+              disabled={processingAuth}
             >
-              Retry Authentication
+              {processingAuth ? "Retrying..." : "Retry Authentication"}
             </button>
             <button 
-              onClick={() => window.location.href = '/login'} 
+              onClick={goToLogin} 
               className="mt-2 px-4 py-2 bg-destructive text-white rounded-md text-sm hover:bg-destructive/90 transition-colors"
+              disabled={processingAuth}
             >
               Back to Login
             </button>
