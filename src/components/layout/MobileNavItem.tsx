@@ -6,11 +6,12 @@ import {
   Users, 
   DoorClosed, 
   LayoutDashboard,
-  User
+  User,
+  Shield
 } from "lucide-react";
 
 interface MobileNavItemProps {
-  icon: "dashboard" | "rooms" | "bookings" | "profile" | "admin" | "roomManagement" | "userManagement";
+  icon: "dashboard" | "rooms" | "bookings" | "profile" | "admin" | "roomManagement" | "userManagement" | "security";
   label: string;
   to: string;
   onClick?: () => void;
@@ -34,6 +35,8 @@ const MobileNavItem = ({ icon, label, to, onClick }: MobileNavItemProps) => {
         return <DoorClosed className="h-5 w-5" />;
       case "userManagement":
         return <Users className="h-5 w-5" />;
+      case "security":
+        return <Shield className="h-5 w-5" />;
       default:
         return <Home className="h-5 w-5" />;
     }

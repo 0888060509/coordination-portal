@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 
 interface NavItemProps {
-  icon: "dashboard" | "rooms" | "bookings" | "admin" | "roomManagement" | "userManagement";
+  icon: "dashboard" | "rooms" | "bookings" | "admin" | "roomManagement" | "userManagement" | "security";
   to: string;
   isActive?: boolean;
   children: ReactNode;
@@ -38,6 +38,8 @@ const NavItem = ({ icon, to, children, isActive, onClick }: NavItemProps) => {
         return <DoorClosed className="h-5 w-5" />;
       case "userManagement":
         return <Users className="h-5 w-5" />;
+      case "security":
+        return <Shield className="h-5 w-5" />;
       default:
         return <Home className="h-5 w-5" />;
     }
