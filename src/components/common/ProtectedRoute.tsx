@@ -16,6 +16,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const location = useLocation();
   const [authTimeout, setAuthTimeout] = useState(false);
   const [processingAuth, setProcessingAuth] = useState(false);
+  const [processingAttempts, setProcessingAttempts] = useState(0);
 
   // Check for authentication hash in URL
   const hasAuthHash = location.hash && location.hash.includes('access_token');
@@ -23,21 +24,26 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   // Process auth hash if present
   useEffect(() => {
     const handleAuthHash = async () => {
-      if (hasAuthHash && !isAuthenticated && !processingAuth) {
+      if (hasAuthHash && !isAuthenticated && !processingAuth && processingAttempts < 3) {
         setProcessingAuth(true);
         try {
-          console.log("ProtectedRoute: Processing auth hash manually");
+          console.log("ProtectedRoute: Processing auth hash manually, attempt:", processingAttempts + 1);
           const session = await processAuthHash();
           if (!session) {
             console.error("Failed to process auth hash");
+            setProcessingAttempts(prev => prev + 1);
             toast({
               variant: "destructive",
               title: "Authentication problem",
               description: "There was a problem processing your login. Please try again.",
             });
+          } else {
+            console.log("Auth hash processed successfully");
+            // No need to manually update the state, the auth listener will handle it
           }
         } catch (error) {
           console.error("Error processing auth hash:", error);
+          setProcessingAttempts(prev => prev + 1);
         } finally {
           setProcessingAuth(false);
         }
@@ -45,7 +51,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     };
 
     handleAuthHash();
-  }, [hasAuthHash, isAuthenticated, processingAuth]);
+  }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts]);
 
   // Add timeout for authentication loading
   useEffect(() => {
@@ -74,6 +80,27 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     };
   }, [isLoading, hasAuthHash, processingAuth]);
 
+  // Add a "retry" function for manual retry
+  const retryAuth = async () => {
+    if (hasAuthHash) {
+      setProcessingAuth(true);
+      try {
+        const session = await processAuthHash();
+        if (!session) {
+          toast({
+            variant: "destructive",
+            title: "Authentication failed",
+            description: "Unable to complete authentication. Please try logging in again.",
+          });
+        }
+      } catch (error) {
+        console.error("Retry auth error:", error);
+      } finally {
+        setProcessingAuth(false);
+      }
+    }
+  };
+
   if (isLoading || hasAuthHash || processingAuth) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
@@ -88,12 +115,24 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             Processing your sign-in, please wait...
           </p>
         )}
-        {(isLoading || authTimeout) && (
-          <p className="mt-2 text-xs text-gray-400">
-            {authTimeout ? 
-              "This is taking longer than expected. You may refresh the page or try logging in again." :
-              "This is taking longer than expected. You may refresh the page if needed."}
-          </p>
+        {(authTimeout) && (
+          <div className="mt-4 flex flex-col items-center">
+            <p className="text-sm text-gray-500">
+              This is taking longer than expected.
+            </p>
+            <button 
+              onClick={retryAuth} 
+              className="mt-2 px-4 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary/90 transition-colors"
+            >
+              Retry Authentication
+            </button>
+            <button 
+              onClick={() => window.location.href = '/login'} 
+              className="mt-2 px-4 py-2 bg-destructive text-white rounded-md text-sm hover:bg-destructive/90 transition-colors"
+            >
+              Back to Login
+            </button>
+          </div>
         )}
       </div>
     );

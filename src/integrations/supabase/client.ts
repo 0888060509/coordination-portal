@@ -1,4 +1,3 @@
-
 // This file contains the Supabase client configuration.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
@@ -39,7 +38,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
         });
     },
   },
-  // Add request retry logic
   db: {
     schema: 'public',
   },
@@ -66,8 +64,10 @@ export const handleSupabaseError = (error: any): string => {
   return 'An unexpected error occurred. Please try again.';
 };
 
-// Helper function to manually parse auth hash from URL (for OAuth flows)
+// Enhanced function to manually parse auth hash from URL (for OAuth flows)
 export const parseAuthHashFromUrl = async () => {
+  console.log('Checking for auth hash in URL');
+  
   if (window.location.hash && window.location.hash.includes('access_token')) {
     try {
       console.log('Found access_token in URL, processing manually...');
@@ -77,22 +77,32 @@ export const parseAuthHashFromUrl = async () => {
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
       const expiresIn = params.get('expires_in');
+      const providerToken = params.get('provider_token');
       
-      if (!accessToken || !refreshToken) {
-        console.error('Missing required tokens in the URL hash');
+      console.log('Extracted tokens:', { 
+        accessToken: accessToken ? 'present' : 'missing', 
+        refreshToken: refreshToken ? 'present' : 'missing',
+        providerToken: providerToken ? 'present' : 'missing'
+      });
+      
+      if (!accessToken) {
+        console.error('Missing access_token in the URL hash');
         return null;
       }
       
       // Try to set the session manually
+      console.log('Attempting to set session with extracted tokens');
       const { data, error } = await supabase.auth.setSession({
         access_token: accessToken,
-        refresh_token: refreshToken
+        refresh_token: refreshToken || ''
       });
       
       if (error) {
         console.error('Error setting session from hash:', error);
         return null;
       }
+      
+      console.log('Session successfully set from hash');
       
       // Clean the URL by removing the hash
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -104,27 +114,42 @@ export const parseAuthHashFromUrl = async () => {
     }
   }
   
+  console.log('No auth hash found in URL');
   return null;
 };
 
-// Function to manually parse access token from URL and exchange it if needed
+// Improved function to process auth hash with additional logging and fallbacks
 export const processAuthHash = async () => {
+  console.log('processAuthHash called, location hash:', window.location.hash?.substring(0, 20) + '...');
+  
   if (!window.location.hash || !window.location.hash.includes('access_token')) {
+    console.log('No access_token in hash, skipping processAuthHash');
     return null;
   }
   
   try {
     // First try the built-in Supabase method
+    console.log('Trying built-in Supabase getSession method first');
     const { data, error } = await supabase.auth.getSession();
     
     if (!error && data.session) {
+      console.log('Built-in getSession successful, user authenticated');
       // Clean the URL
       window.history.replaceState({}, document.title, window.location.pathname);
       return data.session;
     }
     
+    console.log('Built-in getSession failed or no session found, trying manual parsing');
+    
     // If that fails, try manual parsing
-    return await parseAuthHashFromUrl();
+    const session = await parseAuthHashFromUrl();
+    if (session) {
+      console.log('Manual session parsing successful');
+      return session;
+    }
+    
+    console.error('All auth hash processing methods failed');
+    return null;
   } catch (error) {
     console.error('Error processing auth hash:', error);
     return null;
