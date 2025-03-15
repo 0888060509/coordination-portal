@@ -73,18 +73,36 @@ export default LoadingSpinner;
 // Also export a component for content loading
 export const LoadingContent = ({
   className,
+  timeout = 10000, // 10 second timeout
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "w-full flex flex-col items-center justify-center p-8 space-y-4",
-      className
-    )}
-    {...props}
-  >
-    <LoadingSpinner size="md" showText />
-  </div>
-);
+}: React.HTMLAttributes<HTMLDivElement> & { timeout?: number }) => {
+  const [showError, setShowError] = React.useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setShowError(true), timeout);
+    return () => clearTimeout(timer);
+  }, [timeout]);
+
+  if (showError) {
+    return (
+      <div className="text-center text-red-600 p-4">
+        Loading took too long. Please try refreshing the page.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "w-full flex flex-col items-center justify-center p-8 space-y-4",
+        className
+      )}
+      {...props}
+    >
+      <LoadingSpinner size="md" showText />
+    </div>
+  );
+};
 
 // Loading skeleton for UI that's still loading
 export const LoadingSkeleton = ({
