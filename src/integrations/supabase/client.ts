@@ -1,4 +1,3 @@
-
 // This file contains the Supabase client configuration.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
@@ -155,8 +154,8 @@ export const parseAuthHashFromUrl = async () => {
       const sessionData = {
         access_token: accessToken,
         refresh_token: refreshToken || null,
-        expires_in: expiresIn ? parseInt(expiresIn, 10) : 3600,
-        expires_at: expiresAt,
+        ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } as any : {}),
+        ...(expiresAt ? { expires_at: expiresAt } as any : {}),
         token_type: tokenType || 'bearer'
       };
       
@@ -244,8 +243,8 @@ export const processAuthHash = async () => {
         const { data, error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken || null,
-          expires_in: expiresIn ? parseInt(expiresIn, 10) : 3600,
-          expires_at: expiresAt,
+          ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } as any : {}),
+          ...(expiresAt ? { expires_at: expiresAt } as any : {}),
           token_type: params.get('token_type') || 'bearer'
         });
         

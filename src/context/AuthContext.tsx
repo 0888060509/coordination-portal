@@ -230,8 +230,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken || null,
-                expires_in: expiresIn ? parseInt(expiresIn, 10) : 3600,
-                expires_at: expiresAt,
+                // Ensure correct type by casting
+                ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } as any : {}),
+                ...(expiresAt ? { expires_at: expiresAt } as any : {}),
                 token_type: params.get('token_type') || 'bearer'
               });
               
