@@ -1,1 +1,7 @@
+
 project_id = "wdooqruganwbzukglerv"
+
+[auth.external.google]
+enabled = true
+client_id = "293305849622-b35ulbjnbe6vjonr6hq5ptdl5865auds.apps.googleusercontent.com"
+secret = "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"
