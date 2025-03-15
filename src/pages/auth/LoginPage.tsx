@@ -77,6 +77,7 @@ const LoginPage = () => {
                 description: "You are now logged in.",
               });
               navigate('/dashboard', { replace: true });
+              setIsSubmitting(false); //Added to clear loading state
               return;
             }
 
@@ -232,26 +233,19 @@ const LoginPage = () => {
   });
 
   const onSubmit = async (data: FormValues) => {
-    if (isSubmitting) return; // Prevent multiple submissions
-
+    console.log("Submitting login form with data:", { ...data, attemptCount: loginAttempts });
     setIsSubmitting(true);
     setAuthError(null);
-    setLoginAttempts(prev => prev + 1);
-
     try {
-      console.log("Submitting login form with data:", { email: data.email, attemptCount: loginAttempts });
+      console.log("Attempting login for email:", data.email);
       const result = await login(data.email, data.password);
-
       if (result.error) {
-        console.error("Login error returned:", result.error);
         throw result.error;
       }
-
-      console.log("Login successful, result:", result);
-
-      // Force navigation after successful login
-      navigate(from, { replace: true });
-
+      // Successful login - force navigation
+      console.log("Login successful, navigating to dashboard");
+      setIsSubmitting(false);
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error("Login failed:", error);
       setAuthError(typeof error === 'string' ? error : 
