@@ -1,4 +1,3 @@
-
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -294,7 +293,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
       console.log("Authentication is complete but still on login page, navigating to dashboard");
       setTimeout(() => {
         navigate('/dashboard', { replace: true });
-      }, 1000);
+      }, 500);
     }
   }, [isAuthenticated, isLoading, navigate, location.pathname]);
 

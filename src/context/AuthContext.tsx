@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -378,11 +377,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           description: "Welcome back to MeetingMaster!",
         });
         
-        // Add a delay to ensure the profile has been fetched before proceeding
-        setTimeout(() => {
-          // Force navigate to dashboard after successful login
-          navigate('/dashboard', { replace: true });
-        }, 500);
+        // Explicitly return successful login data
+        return { data };
       }
       
       return { data };

@@ -27,28 +27,42 @@ const emitChange = () => {
   });
 };
 
-export const toast = (props: Omit<ToasterToast, "id">) => {
-  const id = crypto.randomUUID();
-  const newToast = { id, ...props };
-  
-  toasts = [newToast, ...toasts].slice(0, TOAST_LIMIT);
-  emitChange();
+// Make toast function directly callable
+function createToastFunction() {
+  const toastFunction = (props: Omit<ToasterToast, "id">) => {
+    const id = crypto.randomUUID();
+    const newToast = { id, ...props };
+    
+    toasts = [newToast, ...toasts].slice(0, TOAST_LIMIT);
+    emitChange();
 
-  return {
-    id: id,
-    dismiss: () => dismiss(id),
-    update: (props: Partial<ToasterToast>) => update(id, props),
+    return {
+      id: id,
+      dismiss: () => dismiss(id),
+      update: (props: Partial<ToasterToast>) => update(id, props),
+    };
   };
-};
 
-toast.dismiss = (toastId?: string) => {
-  toasts = toasts.map((t) => 
-    t.id === toastId || toastId === undefined
-      ? { ...t, open: false }
-      : t
-  );
-  emitChange();
-};
+  // Add methods to the function
+  toastFunction.dismiss = (toastId?: string) => {
+    toasts = toasts.map((t) => 
+      t.id === toastId || toastId === undefined
+        ? { ...t, open: false }
+        : t
+    );
+    emitChange();
+  };
+
+  toastFunction.remove = (toastId: string) => {
+    toasts = toasts.filter((t) => t.id !== toastId);
+    emitChange();
+  };
+
+  return toastFunction;
+}
+
+// Create the toast function with its methods
+export const toast = createToastFunction();
 
 const update = (id: string, props: Partial<ToasterToast>) => {
   toasts = toasts.map((t) => (t.id === id ? { ...t, ...props } : t));
@@ -58,13 +72,6 @@ const update = (id: string, props: Partial<ToasterToast>) => {
 const dismiss = (toastId: string) => {
   toast.dismiss(toastId);
 };
-
-const remove = (toastId: string) => {
-  toasts = toasts.filter((t) => t.id !== toastId);
-  emitChange();
-};
-
-toast.remove = remove;
 
 // Hook to subscribe to toast changes
 export function useToast() {

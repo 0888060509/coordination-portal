@@ -151,48 +151,6 @@ const LoginPage = () => {
             }, 1000);
           } else {
             console.error("Failed to process OAuth hash");
-
-            // Try manual extraction as fallback
-            try {
-              console.log("Attempting manual extraction of tokens from hash");
-              const params = new URLSearchParams(currentHash.substring(1));
-              const accessToken = params.get('access_token');
-              const refreshToken = params.get('refresh_token');
-
-              if (accessToken) {
-                console.log("Found access token, attempting manual session setup");
-                const expiresIn = params.get('expires_in');
-                const expiresAt = expiresIn ? Math.floor(Date.now() / 1000) + parseInt(expiresIn, 10) : undefined;
-
-                const { data, error } = await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken || null,
-                  ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } as any : {}),
-                  ...(expiresAt ? { expires_at: expiresAt } as any : {}),
-                  token_type: params.get('token_type') || 'bearer'
-                });
-
-                if (error) {
-                  throw error;
-                }
-
-                if (data.session) {
-                  console.log("Manual session setup successful");
-                  toast({
-                    title: "Authentication successful",
-                    description: "You are now logged in.",
-                  });
-
-                  setTimeout(() => {
-                    navigate('/dashboard', { replace: true });
-                  }, 1000);
-                  return;
-                }
-              }
-            } catch (manualError) {
-              console.error("Manual token extraction failed:", manualError);
-            }
-
             setProcessingOAuth(false);
             setAuthError("Failed to complete authentication. Please try again.");
           }
