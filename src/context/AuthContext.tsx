@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+import { useToast, toast } from "@/hooks/use-toast";
 import { supabase, handleSupabaseError, processAuthHash } from "@/integrations/supabase/client";
 import { User as SupabaseUser, Session, AuthError } from "@supabase/supabase-js";
 
@@ -145,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
+  const { toast: toastHelper } = useToast();
 
   // Fetch user profile from profiles table with better error handling
   const fetchProfile = async (userId: string, currentSession: Session | null) => {
@@ -258,7 +258,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     handleAuthCallback();
-  }, [location.hash, navigate, toast]);
+  }, [location.hash, navigate, toastHelper]);
 
   // Check if the user is already logged in
   useEffect(() => {
@@ -324,7 +324,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, toast]);
+  }, [navigate, toastHelper]);
 
   // Auth methods
   const login = async (email: string, password: string) => {
@@ -436,7 +436,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      toast.toast({
+      toast({
         title: "Registration successful",
         description: "Welcome to MeetingMaster! Please check your email to verify your account.",
       });
@@ -445,7 +445,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Registration error:", error);
       const authError = error as AuthError;
       
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Registration failed",
         description: authError.message || "An error occurred during registration. Please try again.",
@@ -467,7 +467,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Logout error:", error);
       const authError = error as AuthError;
       
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Logout failed",
         description: authError.message || "An error occurred during logout. Please try again.",
@@ -486,7 +486,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      toast.toast({
+      toast({
         title: "Password reset email sent",
         description: "Check your email for a password reset link.",
       });
@@ -494,7 +494,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Forgot password error:", error);
       const authError = error as AuthError;
       
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Failed to send reset email",
         description: authError.message || "An error occurred. Please try again.",
@@ -513,7 +513,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      toast.toast({
+      toast({
         title: "Password reset successful",
         description: "Your password has been updated. You can now log in.",
       });
@@ -522,7 +522,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Reset password error:", error);
       const authError = error as AuthError;
       
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Failed to reset password",
         description: authError.message || "An error occurred. Please try again.",
@@ -559,14 +559,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await fetchProfile(user.id, session);
       }
       
-      toast.toast({
+      toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
       });
     } catch (error) {
       console.error("Update profile error:", error);
       
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Profile update failed",
         description: "An error occurred while updating your profile.",
