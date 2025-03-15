@@ -238,24 +238,19 @@ const LoginPage = () => {
   const onSubmit = async (data: FormValues) => {
     if (isSubmitting) return;
     
-    console.log("Submitting login form with data:", { ...data, attemptCount: loginAttempts });
     setIsSubmitting(true);
     setAuthError(null);
     
     try {
-      console.log("Attempting login for email:", data.email);
-      await login(data.email, data.password);
+      const result = await login(data.email, data.password);
+      if (result.error) throw result.error;
       
-      // Check if we're authenticated after login
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log("Session confirmed, navigating to dashboard");
-        toast({
-          title: "Success",
-          description: "Logged in successfully",
-        });
-        navigate('/dashboard', { replace: true });
-      }
+      toast({
+        title: "Success",
+        description: "Logged in successfully",
+      });
+      setIsSubmitting(false);
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error("Login failed:", error);
       setAuthError(typeof error === 'string' ? error : 
