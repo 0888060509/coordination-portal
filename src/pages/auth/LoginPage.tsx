@@ -27,16 +27,46 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const LoginPage = () => {
-  const { login, loginWithGoogle, isAuthenticated, isLoading } = useAuth();
+  const { login, loginWithGoogle, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [processingOAuth, setProcessingOAuth] = useState(false);
   const [initialAuthCheck, setInitialAuthCheck] = useState(true);
+  const [loginAttempts, setLoginAttempts] = useState(0);
 
   // Get the page they were trying to access
   const from = location.state?.from?.pathname || "/dashboard";
+
+  // Reset submission state if the page is reloaded
+  useEffect(() => {
+    return () => {
+      setIsSubmitting(false);
+    };
+  }, []);
+
+  // Add a timeout to detect stalled login attempts
+  useEffect(() => {
+    let loginTimeout: NodeJS.Timeout;
+    
+    if (isSubmitting && !authLoading) {
+      loginTimeout = setTimeout(() => {
+        console.log("Login attempt timed out");
+        setIsSubmitting(false);
+        setAuthError("Login attempt timed out. Please try again.");
+        toast({
+          variant: "destructive",
+          title: "Login timeout",
+          description: "Your login request took too long. Please try again.",
+        });
+      }, 8000); // 8 second timeout
+    }
+    
+    return () => {
+      if (loginTimeout) clearTimeout(loginTimeout);
+    };
+  }, [isSubmitting, authLoading]);
 
   // Check for authentication hash on mount
   useEffect(() => {
@@ -83,7 +113,7 @@ const LoginPage = () => {
   useEffect(() => {
     let redirectTimer: NodeJS.Timeout;
     
-    if (isAuthenticated && !isLoading && !processingOAuth && !initialAuthCheck) {
+    if (isAuthenticated && !authLoading && !processingOAuth && !initialAuthCheck) {
       redirectTimer = setTimeout(() => {
         navigate(from, { replace: true });
       }, 100);
@@ -92,7 +122,7 @@ const LoginPage = () => {
     return () => {
       if (redirectTimer) clearTimeout(redirectTimer);
     };
-  }, [isAuthenticated, isLoading, processingOAuth, navigate, from, initialAuthCheck]);
+  }, [isAuthenticated, authLoading, processingOAuth, navigate, from, initialAuthCheck]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -107,18 +137,23 @@ const LoginPage = () => {
     
     setIsSubmitting(true);
     setAuthError(null);
+    setLoginAttempts(prev => prev + 1);
+    
     try {
-      console.log("Submitting login form");
+      console.log("Submitting login form with data:", { email: data.email, attemptCount: loginAttempts });
       const result = await login(data.email, data.password);
+      
       if (result.error) {
+        console.error("Login error returned:", result.error);
         throw result.error;
       }
+      
+      console.log("Login successful, result:", result);
       // Login successful, navigation will be handled by auth state change listener
     } catch (error) {
       console.error("Login failed:", error);
       setAuthError("Invalid email or password. Please try again.");
-    } finally {
-      setIsSubmitting(false); // Always set submitting to false to unlock the form
+      setIsSubmitting(false); // Important: Reset submission state on error
     }
   };
 
@@ -135,8 +170,14 @@ const LoginPage = () => {
     }
   };
 
+  // Force reset the submission state if it's been submitting for too long
+  const handleResetSubmission = () => {
+    setIsSubmitting(false);
+    setAuthError("Login attempt was reset. Please try again.");
+  };
+
   // Only show loading during initial page load or when explicitly processing OAuth
-  const showLoadingState = (isLoading && initialAuthCheck) || processingOAuth;
+  const showLoadingState = (authLoading && initialAuthCheck) || processingOAuth;
 
   if (showLoadingState) {
     return (
@@ -227,6 +268,19 @@ const LoginPage = () => {
             {authError && (
               <div className="mb-6 p-3 bg-red-100 text-red-700 rounded-md">
                 {authError}
+              </div>
+            )}
+
+            {isSubmitting && loginAttempts > 1 && (
+              <div className="mb-6 p-3 bg-yellow-100 text-yellow-700 rounded-md flex flex-col">
+                <span>Sign-in is taking longer than expected...</span>
+                <Button 
+                  variant="link" 
+                  className="self-end text-sm text-yellow-700 underline" 
+                  onClick={handleResetSubmission}
+                >
+                  Cancel and try again
+                </Button>
               </div>
             )}
 

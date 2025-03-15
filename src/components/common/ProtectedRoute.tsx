@@ -4,7 +4,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import { toast } from "@/hooks/use-toast";
-import { processAuthHash } from "@/integrations/supabase/client";
+import { processAuthHash, verifySession } from "@/integrations/supabase/client";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -19,9 +19,27 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const [processingAuth, setProcessingAuth] = useState(false);
   const [processingAttempts, setProcessingAttempts] = useState(0);
   const [hasTriedProcessing, setHasTriedProcessing] = useState(false);
+  const [verifyingSession, setVerifyingSession] = useState(false);
 
   // Check for authentication hash in URL
   const hasAuthHash = location.hash && location.hash.includes('access_token');
+  
+  // Verify session validity if authenticated but no user loaded
+  useEffect(() => {
+    if (isAuthenticated && !user && !isLoading && !verifyingSession) {
+      const checkSession = async () => {
+        setVerifyingSession(true);
+        const isValid = await verifySession();
+        if (!isValid) {
+          console.log("Session invalid, redirecting to login");
+          navigate("/login", { replace: true });
+        }
+        setVerifyingSession(false);
+      };
+      
+      checkSession();
+    }
+  }, [isAuthenticated, user, isLoading, navigate, verifyingSession]);
 
   // Process auth hash if present
   useEffect(() => {
@@ -105,6 +123,11 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           title: "Authentication problem",
           description: "There was a problem completing your authentication. Please try logging in again.",
         });
+        
+        // If still loading after 15 seconds, redirect to login
+        if (isLoading || processingAuth) {
+          navigate('/login', { replace: true });
+        }
       }, 15000); // 15 second timeout
     } else {
       setAuthTimeout(false);
@@ -114,7 +137,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
       if (timeoutId) clearTimeout(timeoutId);
       if (longTimeoutId) clearTimeout(longTimeoutId);
     };
-  }, [isLoading, hasAuthHash, processingAuth]);
+  }, [isLoading, hasAuthHash, processingAuth, navigate]);
 
   // Add a "retry" function for manual retry
   const retryAuth = async () => {
@@ -169,11 +192,11 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
       description: "Please try signing in again.",
     });
     
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   // Only show loading during active processing
-  const showLoading = isLoading || (hasAuthHash && processingAuth);
+  const showLoading = isLoading || (hasAuthHash && processingAuth) || verifyingSession;
 
   if (showLoading) {
     return (
@@ -182,7 +205,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           size="lg" 
           color="primary" 
           showText={true} 
-          text={hasAuthHash ? "Completing authentication..." : "Loading your account..."} 
+          text={verifyingSession ? "Verifying your session..." : hasAuthHash ? "Completing authentication..." : "Loading your account..."} 
         />
         {hasAuthHash && (
           <p className="mt-4 text-sm text-gray-500">

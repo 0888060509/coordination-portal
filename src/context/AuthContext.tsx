@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useToast, toast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { supabase, handleSupabaseError, processAuthHash } from "@/integrations/supabase/client";
 import { User as SupabaseUser, Session, AuthError } from "@supabase/supabase-js";
 
@@ -23,7 +23,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<{ error?: AuthError }>;
+  login: (email: string, password: string) => Promise<{ error?: AuthError; data?: any }>;
   loginWithGoogle: () => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -145,7 +145,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast: toastHelper } = useToast();
 
   // Fetch user profile from profiles table with better error handling
   const fetchProfile = async (userId: string, currentSession: Session | null) => {
@@ -258,7 +257,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     handleAuthCallback();
-  }, [location.hash, navigate, toastHelper]);
+  }, [location.hash, navigate]);
 
   // Check if the user is already logged in
   useEffect(() => {
@@ -324,13 +323,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, toastHelper]);
+  }, [navigate]);
 
   // Auth methods
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
+    let loginError: AuthError | undefined;
+    
     try {
       console.log("Attempting login for email:", email);
+      setIsLoading(true);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -338,8 +339,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (error) {
-        console.error("Login error:", error);
-        throw error;
+        console.error("Login error from Supabase:", error);
+        loginError = error;
+        
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description: error.message || "Please check your credentials and try again.",
+        });
+        
+        setIsLoading(false);
+        return { error };
       }
       
       console.log("Login successful, session created:", data.session ? "Yes" : "No");
@@ -356,16 +366,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       return { data };
     } catch (error) {
-      console.error("Login error:", error);
-      const authError = error as AuthError;
+      console.error("Unexpected login error:", error);
       
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: authError.message || "Please check your credentials and try again.",
+        description: "An unexpected error occurred. Please try again.",
       });
+      
       setIsLoading(false);
-      return { error: authError };
+      return { error: loginError || { message: "Unknown error occurred" } as AuthError };
     }
   };
 

@@ -250,3 +250,33 @@ export const processAuthHash = async () => {
     return null;
   }
 };
+
+// Helper function to refresh the auth session state
+export const refreshSession = async () => {
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.error("Error refreshing session:", error);
+      return null;
+    }
+    return data.session;
+  } catch (error) {
+    console.error("Unexpected error refreshing session:", error);
+    return null;
+  }
+};
+
+// Helper to verify if the current session is valid
+export const verifySession = async () => {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      console.log("No valid user in session");
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Error verifying session:", error);
+    return false;
+  }
+};
