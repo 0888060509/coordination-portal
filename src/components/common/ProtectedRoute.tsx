@@ -162,8 +162,8 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken || null,
-            expires_in: expiresIn ? parseInt(expiresIn, 10) : 3600,
-            expires_at: expiresAt,
+            ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } as any : {}),
+            ...(expiresAt ? { expires_at: expiresAt } as any : {}),
             token_type: params.get('token_type') || 'bearer'
           });
           
