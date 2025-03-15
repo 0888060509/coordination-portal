@@ -8,7 +8,7 @@ import {
   Users, 
   DoorClosed, 
   MapPin, 
-  Check, In,
+  Check,
   ArrowLeft,
   Trash,
   Edit
