@@ -1,8 +1,7 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { supabase, handleSupabaseError } from "@/integrations/supabase/client";
+import { supabase, handleSupabaseError, processAuthHash } from "@/integrations/supabase/client";
 import { User as SupabaseUser, Session, AuthError } from "@supabase/supabase-js";
 
 // Types
@@ -146,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const toast = useToast();
+  const { toast } = useToast();
 
   // Fetch user profile from profiles table with better error handling
   const fetchProfile = async (userId: string, currentSession: Session | null) => {
@@ -189,84 +188,65 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           console.log("Processing OAuth callback...");
           
+          // Try using our custom helper to process the hash
+          const session = await processAuthHash();
+          
+          if (session) {
+            console.log("Successfully processed auth hash with custom handler");
+            setSession(session);
+            await fetchProfile(session.user.id, session);
+            navigate('/dashboard');
+            return;
+          }
+          
+          // If that fails, try manual extraction as a fallback
+          console.log("Custom handler failed, trying manual extraction");
+          
           // Extract access token from hash
           const params = new URLSearchParams(location.hash.substring(1));
           const accessToken = params.get('access_token');
           const refreshToken = params.get('refresh_token');
-          const expiresIn = params.get('expires_in');
           
           if (!accessToken) {
             throw new Error("No access token found in URL");
           }
           
-          console.log("Extracted OAuth tokens, now getting session");
-          
-          // Get the session
-          // Note: Supabase's getSession() should automatically use the hash, but we can try manually if needed
-          const { data, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error("Error getting session:", error);
-            throw error;
-          }
-          
-          console.log("Got session response:", data?.session ? "Session exists" : "No session");
-          
-          if (data.session) {
-            console.log("Session found with user ID:", data.session.user.id);
-            setSession(data.session);
-            await fetchProfile(data.session.user.id, data.session);
-            
-            // Clean up the URL by removing the hash fragment
-            window.history.replaceState({}, document.title, window.location.pathname);
-            
-            toast.toast({
-              title: "Successfully signed in with Google",
-              description: "Welcome to MeetingMaster!",
-            });
-            
-            navigate('/dashboard');
-          } else {
-            console.error("No session in OAuth callback");
-            setIsLoading(false);
-            
-            // Try manual session creation with the tokens from the URL (as a fallback)
-            if (accessToken && refreshToken) {
-              try {
-                console.log("Trying manual session setup with tokens");
-                const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken
+          // Try manual session setup with the tokens from the URL
+          if (accessToken && refreshToken) {
+            try {
+              console.log("Trying manual session setup with tokens");
+              const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+              });
+              
+              if (sessionError) {
+                throw sessionError;
+              }
+              
+              if (sessionData.session) {
+                console.log("Manual session setup successful");
+                setSession(sessionData.session);
+                await fetchProfile(sessionData.session.user.id, sessionData.session);
+                
+                // Clean up the URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                toast({
+                  title: "Successfully signed in with Google",
+                  description: "Welcome to MeetingMaster!",
                 });
                 
-                if (sessionError) {
-                  throw sessionError;
-                }
-                
-                if (sessionData.session) {
-                  console.log("Manual session setup successful");
-                  setSession(sessionData.session);
-                  await fetchProfile(sessionData.session.user.id, sessionData.session);
-                  
-                  // Clean up the URL
-                  window.history.replaceState({}, document.title, window.location.pathname);
-                  
-                  toast.toast({
-                    title: "Successfully signed in with Google",
-                    description: "Welcome to MeetingMaster!",
-                  });
-                  
-                  navigate('/dashboard');
-                }
-              } catch (manualError) {
-                console.error("Manual session setup failed:", manualError);
-                throw manualError;
+                navigate('/dashboard');
               }
+            } catch (manualError) {
+              console.error("Manual session setup failed:", manualError);
+              throw manualError;
             }
           }
         } catch (error) {
           console.error("Error processing OAuth redirect:", error);
-          toast.toast({
+          toast({
             variant: "destructive",
             title: "Authentication failed",
             description: "Failed to authenticate with Google. Please try again.",
@@ -309,7 +289,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("Auth state changed:", event, session);
+        console.log("Auth state changed:", event, session ? "Session exists" : "No session");
         setSession(session);
         
         if (session?.user) {
@@ -323,7 +303,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         // Handle specific auth events
         if (event === 'SIGNED_IN') {
-          toast.toast({
+          toast({
             title: "Successfully signed in",
             description: "Welcome to MeetingMaster!",
           });
@@ -331,7 +311,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         if (event === 'SIGNED_OUT') {
-          toast.toast({
+          toast({
             title: "Successfully signed out",
             description: "You have been logged out successfully",
           });
@@ -350,17 +330,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
+      console.log("Attempting login for email:", email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Login error:", error);
+        throw error;
+      }
       
+      console.log("Login successful, session created:", data.session ? "Yes" : "No");
       setSession(data.session);
-      // The user will be set by the onAuthStateChange listener
       
-      toast.toast({
+      if (data.session?.user) {
+        await fetchProfile(data.session.user.id, data.session);
+      }
+      
+      toast({
         title: "Login successful",
         description: "Welcome back to MeetingMaster!",
       });
@@ -370,7 +359,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Login error:", error);
       const authError = error as AuthError;
       
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Login failed",
         description: authError.message || "Please check your credentials and try again.",
@@ -383,6 +372,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithGoogle = async () => {
     try {
       setIsLoading(true);
+      
+      console.log("Initiating Google login");
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -393,13 +384,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Google login initiation error:", error);
+        throw error;
+      }
+      
       // Auth state change will be handled by the listener
     } catch (error) {
       console.error("Google login error:", error);
       const authError = error as AuthError;
       
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Google login failed",
         description: authError.message || "An error occurred during Google login.",

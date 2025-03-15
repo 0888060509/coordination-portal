@@ -15,7 +15,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false, // Changed this to false to disable automatic handling
+    detectSessionInUrl: false, // Explicitly disable automatic handling to avoid hash parsing issues
     flowType: 'implicit', // This is important for OAuth with hash fragment handling
     debug: true, // Enable debug mode to see more information about auth state
   },
@@ -146,11 +146,16 @@ export const parseAuthHashFromUrl = async () => {
       // Prepare session data
       const sessionData = {
         access_token: accessToken,
-        refresh_token: refreshToken || '',
+        refresh_token: refreshToken || null,
         expires_in: expiresIn ? parseInt(expiresIn, 10) : 3600,
         expires_at: expiresAt,
         token_type: tokenType || 'bearer'
       };
+      
+      // Clear hash from URL before processing to prevent loops
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
       
       const { data, error } = await supabase.auth.setSession(sessionData);
       
@@ -165,12 +170,6 @@ export const parseAuthHashFromUrl = async () => {
       }
       
       console.log('Session successfully set from hash');
-      
-      // Clean the URL by removing the hash
-      if (window.history && window.history.replaceState) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-      
       return data.session;
     } catch (error) {
       console.error('Error in parseAuthHashFromUrl:', error);

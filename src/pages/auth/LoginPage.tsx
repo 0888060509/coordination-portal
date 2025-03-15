@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +15,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { processAuthHash } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -30,12 +31,45 @@ const LoginPage = () => {
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [processingOAuth, setProcessingOAuth] = useState(false);
 
   // Get the page they were trying to access
   const from = location.state?.from?.pathname || "/dashboard";
 
+  // Check for authentication hash on mount
+  useEffect(() => {
+    // Only run if we have an auth hash in the URL
+    if (location.hash && location.hash.includes('access_token')) {
+      const processAuth = async () => {
+        try {
+          setProcessingOAuth(true);
+          setAuthError(null);
+          
+          console.log("Login page: Processing OAuth hash");
+          const session = await processAuthHash();
+          
+          if (session) {
+            console.log("Login page: OAuth processing successful");
+            toast({
+              title: "Successfully signed in",
+              description: "Welcome to MeetingMaster!",
+            });
+            navigate('/dashboard');
+          }
+        } catch (error) {
+          console.error("Error processing OAuth in LoginPage:", error);
+          setAuthError("Failed to complete authentication. Please try again.");
+        } finally {
+          setProcessingOAuth(false);
+        }
+      };
+      
+      processAuth();
+    }
+  }, [location.hash, navigate]);
+
   // If user is already authenticated, redirect to dashboard
-  if (isAuthenticated && !isLoading) {
+  if (isAuthenticated && !isLoading && !processingOAuth) {
     return <Navigate to={from} replace />;
   }
 
@@ -51,15 +85,16 @@ const LoginPage = () => {
     setIsSubmitting(true);
     setAuthError(null);
     try {
+      console.log("Submitting login form");
       const result = await login(data.email, data.password);
       if (result.error) {
         throw result.error;
       }
+      // Login successful, navigation will be handled by auth state change listener
     } catch (error) {
       console.error("Login failed:", error);
       setAuthError("Invalid email or password. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Only set submitting to false on error
     }
   };
 
@@ -73,6 +108,21 @@ const LoginPage = () => {
       setAuthError("Google login failed. Please try again.");
     }
   };
+
+  // Loading state
+  if (isLoading || processingOAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-meeting-primary" />
+          <h2 className="mt-4 text-xl font-semibold">
+            {processingOAuth ? "Completing authentication..." : "Loading..."}
+          </h2>
+          <p className="mt-2 text-gray-500">Please wait while we sign you in.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -157,6 +207,7 @@ const LoginPage = () => {
                           placeholder="you@example.com"
                           type="email"
                           {...field}
+                          disabled={isSubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -175,6 +226,7 @@ const LoginPage = () => {
                           placeholder="********"
                           type="password"
                           {...field}
+                          disabled={isSubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -226,6 +278,7 @@ const LoginPage = () => {
                   variant="outline"
                   className="w-full"
                   onClick={handleGoogleLogin}
+                  disabled={isSubmitting}
                 >
                   <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
                     <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
