@@ -4,6 +4,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import { toast } from "@/hooks/use-toast";
+import { processAuthHash } from "@/integrations/supabase/client";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -14,15 +15,43 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { isAuthenticated, user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
   const [authTimeout, setAuthTimeout] = useState(false);
+  const [processingAuth, setProcessingAuth] = useState(false);
 
   // Check for authentication hash in URL
   const hasAuthHash = location.hash && location.hash.includes('access_token');
+
+  // Process auth hash if present
+  useEffect(() => {
+    const handleAuthHash = async () => {
+      if (hasAuthHash && !isAuthenticated && !processingAuth) {
+        setProcessingAuth(true);
+        try {
+          console.log("ProtectedRoute: Processing auth hash manually");
+          const session = await processAuthHash();
+          if (!session) {
+            console.error("Failed to process auth hash");
+            toast({
+              variant: "destructive",
+              title: "Authentication problem",
+              description: "There was a problem processing your login. Please try again.",
+            });
+          }
+        } catch (error) {
+          console.error("Error processing auth hash:", error);
+        } finally {
+          setProcessingAuth(false);
+        }
+      }
+    };
+
+    handleAuthHash();
+  }, [hasAuthHash, isAuthenticated, processingAuth]);
 
   // Add timeout for authentication loading
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
-    if (isLoading || hasAuthHash) {
+    if (isLoading || hasAuthHash || processingAuth) {
       timeoutId = setTimeout(() => {
         console.log("Authentication loading timeout reached");
         setAuthTimeout(true);
@@ -43,9 +72,9 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isLoading, hasAuthHash]);
+  }, [isLoading, hasAuthHash, processingAuth]);
 
-  if (isLoading || hasAuthHash) {
+  if (isLoading || hasAuthHash || processingAuth) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <LoadingSpinner 

@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -35,9 +36,14 @@ interface AuthContextType {
 
 // Helper function to transform Supabase user to our User type
 const transformUser = async (supabaseUser: SupabaseUser | null, session: Session | null): Promise<User | null> => {
-  if (!supabaseUser) return null;
+  if (!supabaseUser) {
+    console.log("No supabase user available in transformUser");
+    return null;
+  }
   
   try {
+    console.log("Transforming user:", supabaseUser.id);
+    
     // Fetch the user's profile from our profiles table
     const { data: profile, error } = await supabase
       .from('profiles')
@@ -47,53 +53,69 @@ const transformUser = async (supabaseUser: SupabaseUser | null, session: Session
     
     if (error) {
       console.error('Error fetching user profile:', error);
-      return null;
-    }
-    
-    if (!profile) {
-      console.log('No profile found for user, creating one...');
-      // Create a profile for this user
-      const firstName = supabaseUser.user_metadata?.full_name?.split(' ')?.[0] || '';
-      const lastName = supabaseUser.user_metadata?.full_name?.split(' ')?.slice(1)?.join(' ') || '';
       
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({
+      // Create profile if it doesn't exist (especially important for OAuth users)
+      if (error.code === 'PGRST116') { // This is the "no rows returned" error code
+        console.log('No profile found for user, creating one...');
+        
+        // Extract name parts from either user_metadata or raw_user_meta_data
+        const metadata = supabaseUser.user_metadata || {};
+        const fullName = metadata.full_name || metadata.name || '';
+        let firstName = metadata.first_name || '';
+        let lastName = metadata.last_name || '';
+        
+        // If we have a full name but not first/last name, try to split it
+        if (fullName && (!firstName || !lastName)) {
+          const nameParts = fullName.split(' ');
+          firstName = firstName || nameParts[0] || '';
+          lastName = lastName || nameParts.slice(1).join(' ') || '';
+        }
+        
+        // Try to get avatar URL
+        const avatarUrl = metadata.avatar_url || metadata.picture || '';
+        
+        // Create a profile for this user
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: supabaseUser.id,
+            first_name: firstName,
+            last_name: lastName,
+            email: supabaseUser.email || '',
+            avatar_url: avatarUrl,
+          });
+          
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          return null;
+        }
+        
+        // Fetch the newly created profile
+        const { data: newProfile, error: fetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', supabaseUser.id)
+          .single();
+          
+        if (fetchError || !newProfile) {
+          console.error('Error fetching new profile:', fetchError);
+          return null;
+        }
+        
+        return {
           id: supabaseUser.id,
-          first_name: firstName,
-          last_name: lastName,
           email: supabaseUser.email || '',
-          avatar_url: supabaseUser.user_metadata?.avatar_url || '',
-        });
-        
-      if (insertError) {
-        console.error('Error creating profile:', insertError);
-        return null;
+          name: `${newProfile.first_name} ${newProfile.last_name}`.trim() || supabaseUser.email || '',
+          firstName: newProfile.first_name || '',
+          lastName: newProfile.last_name || '',
+          avatarUrl: newProfile.avatar_url || avatarUrl,
+          role: newProfile.is_admin ? 'admin' : 'user',
+          department: newProfile.department || undefined,
+          position: newProfile.position || undefined,
+        };
       }
       
-      // Fetch the newly created profile
-      const { data: newProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', supabaseUser.id)
-        .single();
-        
-      if (fetchError || !newProfile) {
-        console.error('Error fetching new profile:', fetchError);
-        return null;
-      }
-      
-      return {
-        id: supabaseUser.id,
-        email: supabaseUser.email || '',
-        name: `${newProfile.first_name} ${newProfile.last_name}`.trim() || supabaseUser.email || '',
-        firstName: newProfile.first_name || '',
-        lastName: newProfile.last_name || '',
-        avatarUrl: newProfile.avatar_url || supabaseUser.user_metadata?.avatar_url,
-        role: newProfile.is_admin ? 'admin' : 'user',
-        department: newProfile.department || undefined,
-        position: newProfile.position || undefined,
-      };
+      return null;
     }
     
     return {
@@ -159,14 +181,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Handle hash fragment from OAuth redirects
   useEffect(() => {
-    const handleHashFragment = async () => {
+    const handleAuthCallback = async () => {
       // Check if we have a hash in the URL (from OAuth redirect)
       if (location.hash && location.hash.includes('access_token')) {
         setIsLoading(true);
+        
         try {
           console.log("Processing OAuth callback...");
           
-          // Get session from the URL hash
+          // Extract access token from hash
+          const params = new URLSearchParams(location.hash.substring(1));
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+          const expiresIn = params.get('expires_in');
+          
+          if (!accessToken) {
+            throw new Error("No access token found in URL");
+          }
+          
+          console.log("Extracted OAuth tokens, now getting session");
+          
+          // Get the session
+          // Note: Supabase's getSession() should automatically use the hash, but we can try manually if needed
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -174,8 +210,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw error;
           }
           
+          console.log("Got session response:", data?.session ? "Session exists" : "No session");
+          
           if (data.session) {
-            console.log("Got session:", data.session.user.id);
+            console.log("Session found with user ID:", data.session.user.id);
             setSession(data.session);
             await fetchProfile(data.session.user.id, data.session);
             
@@ -191,6 +229,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } else {
             console.error("No session in OAuth callback");
             setIsLoading(false);
+            
+            // Try manual session creation with the tokens from the URL (as a fallback)
+            if (accessToken && refreshToken) {
+              try {
+                console.log("Trying manual session setup with tokens");
+                const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken
+                });
+                
+                if (sessionError) {
+                  throw sessionError;
+                }
+                
+                if (sessionData.session) {
+                  console.log("Manual session setup successful");
+                  setSession(sessionData.session);
+                  await fetchProfile(sessionData.session.user.id, sessionData.session);
+                  
+                  // Clean up the URL
+                  window.history.replaceState({}, document.title, window.location.pathname);
+                  
+                  toast.toast({
+                    title: "Successfully signed in with Google",
+                    description: "Welcome to MeetingMaster!",
+                  });
+                  
+                  navigate('/dashboard');
+                }
+              } catch (manualError) {
+                console.error("Manual session setup failed:", manualError);
+                throw manualError;
+              }
+            }
           }
         } catch (error) {
           console.error("Error processing OAuth redirect:", error);
@@ -205,7 +277,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     
-    handleHashFragment();
+    handleAuthCallback();
   }, [location.hash, navigate, toast]);
 
   // Check if the user is already logged in

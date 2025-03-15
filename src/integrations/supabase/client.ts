@@ -14,8 +14,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: true, // This is critical for OAuth hash fragment handling
     flowType: 'implicit', // This is important for OAuth with hash fragment handling
+    debug: true, // Enable debug mode to see more information about auth state
   },
   global: {
     fetch: (url: RequestInfo | URL, options?: RequestInit) => {
@@ -65,15 +66,31 @@ export const handleSupabaseError = (error: any): string => {
   return 'An unexpected error occurred. Please try again.';
 };
 
-// Helper function to parse auth hash from URL (for OAuth flows)
+// Helper function to manually parse auth hash from URL (for OAuth flows)
 export const parseAuthHashFromUrl = async () => {
   if (window.location.hash && window.location.hash.includes('access_token')) {
     try {
-      console.log('Found access_token in URL, processing...');
-      const { data, error } = await supabase.auth.getSession();
+      console.log('Found access_token in URL, processing manually...');
+      
+      // Extract tokens from the hash
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      const expiresIn = params.get('expires_in');
+      
+      if (!accessToken || !refreshToken) {
+        console.error('Missing required tokens in the URL hash');
+        return null;
+      }
+      
+      // Try to set the session manually
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
       
       if (error) {
-        console.error('Error parsing auth hash:', error);
+        console.error('Error setting session from hash:', error);
         return null;
       }
       
@@ -88,4 +105,28 @@ export const parseAuthHashFromUrl = async () => {
   }
   
   return null;
+};
+
+// Function to manually parse access token from URL and exchange it if needed
+export const processAuthHash = async () => {
+  if (!window.location.hash || !window.location.hash.includes('access_token')) {
+    return null;
+  }
+  
+  try {
+    // First try the built-in Supabase method
+    const { data, error } = await supabase.auth.getSession();
+    
+    if (!error && data.session) {
+      // Clean the URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return data.session;
+    }
+    
+    // If that fails, try manual parsing
+    return await parseAuthHashFromUrl();
+  } catch (error) {
+    console.error('Error processing auth hash:', error);
+    return null;
+  }
 };
