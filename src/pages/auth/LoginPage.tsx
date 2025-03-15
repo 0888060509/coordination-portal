@@ -51,8 +51,10 @@ const LoginPage = () => {
     setIsSubmitting(true);
     setAuthError(null);
     try {
-      await login(data.email, data.password);
-      // The navigation will be handled by the auth state change listener
+      const result = await login(data.email, data.password);
+      if (result.error) {
+        throw result.error;
+      }
     } catch (error) {
       console.error("Login failed:", error);
       setAuthError("Invalid email or password. Please try again.");
