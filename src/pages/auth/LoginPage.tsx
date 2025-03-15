@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -37,17 +36,14 @@ const LoginPage = () => {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [forcingNavigation, setForcingNavigation] = useState(false);
 
-  // Get the page they were trying to access
   const from = location.state?.from?.pathname || "/dashboard";
 
-  // Reset submission state when unmounting
   useEffect(() => {
     return () => {
       setIsSubmitting(false);
     };
   }, []);
 
-  // Add a short delay for initial auth check to prevent flashing
   useEffect(() => {
     const timer = setTimeout(() => {
       setInitialAuthCheck(false);
@@ -56,18 +52,15 @@ const LoginPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Simplified: Direct navigation after authentication
   useEffect(() => {
     if (isAuthenticated && !processingOAuth) {
       console.log("User authenticated, navigating to dashboard");
-      // Use a small timeout to ensure state updates are complete
       setTimeout(() => {
         navigate('/dashboard', { replace: true });
       }, 500);
     }
   }, [isAuthenticated, processingOAuth, navigate]);
 
-  // Add timeout to detect stalled login attempts
   useEffect(() => {
     let loginTimeout: NodeJS.Timeout;
 
@@ -76,7 +69,6 @@ const LoginPage = () => {
 
       loginTimeout = setTimeout(() => {
         console.log("Login attempt timed out after 10s");
-        // Check session status
         const checkSessionStatus = async () => {
           try {
             console.log("Checking session status after timeout");
@@ -92,7 +84,6 @@ const LoginPage = () => {
               return;
             }
 
-            // If no session, show the timeout message
             setIsSubmitting(false);
             setAuthError("Login attempt timed out. Please try again.");
             toast({
@@ -116,16 +107,16 @@ const LoginPage = () => {
     };
   }, [isSubmitting, authLoading, navigate]);
 
-  // Simplified OAuth hash processing
   useEffect(() => {
-    if (location.hash && location.hash.includes('access_token')) {
+    if (location.hash) {
+      console.log("LoginPage detected hash in URL:", location.hash.substring(0, 30) + "...");
+      
       const processAuth = async () => {
         try {
           setProcessingOAuth(true);
           setAuthError(null);
-          console.log("Processing OAuth hash");
+          console.log("LoginPage processing OAuth hash");
           
-          // Clear hash to prevent repeated processing
           if (window.history && window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           }
@@ -133,24 +124,38 @@ const LoginPage = () => {
           const session = await processAuthHash();
           
           if (session) {
-            console.log("OAuth processing successful");
+            console.log("OAuth processing successful in LoginPage");
             toast({
               title: "Successfully signed in",
               description: "Welcome to MeetingMaster!",
             });
             
-            // Force navigation after successful OAuth
-            setProcessingOAuth(false);
-            navigate('/dashboard', { replace: true });
+            setTimeout(() => {
+              console.log("LoginPage forcing navigation to dashboard after OAuth");
+              setProcessingOAuth(false);
+              navigate('/dashboard', { replace: true });
+            }, 1000);
           } else {
-            console.error("Failed to process OAuth hash");
+            console.error("Failed to process OAuth hash in LoginPage");
             setProcessingOAuth(false);
             setAuthError("Failed to complete authentication. Please try again.");
+            
+            toast({
+              variant: "destructive",
+              title: "Authentication failed",
+              description: "Could not complete the Google sign-in process. Please try again.",
+            });
           }
         } catch (error) {
-          console.error("Error processing OAuth:", error);
+          console.error("Error processing OAuth in LoginPage:", error);
           setAuthError("Failed to complete authentication. Please try again.");
           setProcessingOAuth(false);
+          
+          toast({
+            variant: "destructive",
+            title: "Authentication error",
+            description: "An unexpected error occurred during Google sign-in.",
+          });
         }
       };
 
@@ -166,7 +171,6 @@ const LoginPage = () => {
     },
   });
 
-  // Improved onSubmit with better error handling and explicit navigation
   const onSubmit = async (data: FormValues) => {
     if (isSubmitting) return;
     
@@ -182,17 +186,14 @@ const LoginPage = () => {
         throw result.error;
       }
       
-      // Successful login
       console.log("Login successful, session created");
       toast({
         title: "Success",
         description: "Logged in successfully",
       });
       
-      // Important: Set loading state to false BEFORE navigation
       setIsSubmitting(false);
       
-      // Force navigate to dashboard with a small delay to ensure state updates
       setTimeout(() => {
         console.log("Forcing navigation to dashboard after login");
         navigate('/dashboard', { replace: true });
@@ -200,10 +201,8 @@ const LoginPage = () => {
     } catch (error) {
       console.error("Login failed:", error);
       
-      // Clear loading state
       setIsSubmitting(false);
       
-      // Set appropriate error message
       setAuthError(
         typeof error === 'string' ? error : 
         error instanceof Error ? error.message : 
@@ -225,18 +224,22 @@ const LoginPage = () => {
 
     setAuthError(null);
     try {
+      console.log("Initiating Google login from LoginPage");
+      
+      toast({
+        title: "Redirecting to Google",
+        description: "Please complete the sign-in process with Google.",
+      });
+      
       await loginWithGoogle();
-      // Auth state change will handle navigation
     } catch (error) {
-      console.error("Google login failed:", error);
+      console.error("Google login failed in LoginPage:", error);
       setAuthError("Google login failed. Please try again.");
     }
   };
 
-  // Only show loading during initial page load or when explicitly processing OAuth
   const showLoadingState = (authLoading && initialAuthCheck) || processingOAuth;
 
-  // Reset the submission state if it's been submitting for too long
   const handleResetSubmission = () => {
     setIsSubmitting(false);
     setAuthError("Login attempt was reset. Please try again.");
@@ -263,7 +266,6 @@ const LoginPage = () => {
     );
   }
 
-  // Regular login form view
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:flex lg:w-1/2 bg-meeting-primary bg-opacity-90 p-12 text-white">

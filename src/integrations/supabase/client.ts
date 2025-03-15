@@ -14,9 +14,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false, // Explicitly disable automatic handling to avoid hash parsing issues
+    detectSessionInUrl: true, // Enable automatic hash handling
     flowType: 'implicit', // This is important for OAuth with hash fragment handling
-    debug: false, // Disable debug mode in production
+    debug: true, // Enable debug mode to see detailed auth logs
   },
   global: {
     fetch: (url: RequestInfo | URL, options?: RequestInit) => {
@@ -93,9 +93,9 @@ const verifyOAuthState = (responseState: string | null) => {
 export const parseAuthHashFromUrl = async () => {
   console.log('Checking for auth hash in URL:', window.location.hash);
   
-  if (window.location.hash && window.location.hash.includes('access_token')) {
+  if (window.location.hash) {
     try {
-      console.log('Found access_token in URL hash, processing manually...');
+      console.log('Found hash in URL, processing manually...', window.location.hash.substring(0, 20) + '...');
       
       // Capture the hash before clearing it
       const currentHash = window.location.hash;
@@ -103,6 +103,12 @@ export const parseAuthHashFromUrl = async () => {
       // Clear hash from URL immediately to prevent multiple processing attempts
       if (window.history && window.history.replaceState) {
         window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      }
+      
+      // Check if hash actually contains access_token
+      if (!currentHash.includes('access_token')) {
+        console.warn('Hash does not contain access_token:', currentHash.substring(0, 20) + '...');
+        return null;
       }
       
       // Extract tokens from the captured hash
@@ -188,95 +194,65 @@ export const parseAuthHashFromUrl = async () => {
   return null;
 };
 
-// Fixed processAuthHash function with protection against multiple executions
-let isProcessingHash = false;
-let lastProcessTime = 0;
-const PROCESS_COOLDOWN = 2000; // 2 second cooldown
-
-// Improved function to process auth hash with additional logging and fallbacks
+// Improved processAuthHash function
 export const processAuthHash = async () => {
-  const currentTime = Date.now();
-  
-  // Only process if not already processing and cooldown period has elapsed
-  if (isProcessingHash || currentTime - lastProcessTime < PROCESS_COOLDOWN) {
-    console.log('Skipping processAuthHash - already processing or cooldown not elapsed');
-    return null;
-  }
-  
   console.log('processAuthHash called, location hash:', window.location.hash?.substring(0, 30) + '...');
   
-  if (!window.location.hash || !window.location.hash.includes('access_token')) {
-    console.log('No access_token in hash, skipping processAuthHash');
-    return null;
-  }
-  
   try {
-    isProcessingHash = true;
-    lastProcessTime = currentTime;
+    // First try built-in Supabase auth state change detection
+    console.log('Checking current session first...');
+    const { data: sessionData } = await supabase.auth.getSession();
     
-    // Clear hash from URL first to prevent processing loops
-    const currentHash = window.location.hash;
-    if (window.history && window.history.replaceState) {
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    if (sessionData.session) {
+      console.log('Active session found, no need to process hash');
+      return sessionData.session;
     }
     
-    // First try manual parsing since the built-in methods don't seem to be working
-    console.log('Trying manual hash parsing first');
-    const session = await parseAuthHashFromUrl();
-    if (session) {
-      console.log('Manual session parsing successful');
-      isProcessingHash = false;
-      return session;
-    }
-    
-    // If that fails, try parsing the saved hash
-    console.log('Manual parsing failed, trying with saved hash');
-    if (currentHash) {
-      const params = new URLSearchParams(currentHash.substring(1));
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+    // Then try manual parsing
+    if (window.location.hash) {
+      console.log('Attempting to parse auth hash manually');
       
-      if (accessToken) {
-        const expiresIn = params.get('expires_in');
-        const expiresAt = expiresIn ? Math.floor(Date.now() / 1000) + parseInt(expiresIn, 10) : undefined;
+      // If we have a hash but it doesn't contain access_token, try to get it from the full URL
+      if (!window.location.hash.includes('access_token')) {
+        console.log('Hash doesn't contain access_token, checking full URL');
+        const fullUrl = window.location.href;
         
-        const { data, error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || null,
-          ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } as any : {}),
-          ...(expiresAt ? { expires_at: expiresAt } as any : {}),
-          token_type: params.get('token_type') || 'bearer'
-        });
-        
-        if (!error && data.session) {
-          console.log('Session set successfully with saved hash');
-          isProcessingHash = false;
-          return data.session;
+        if (fullUrl.includes('access_token')) {
+          const hashStart = fullUrl.indexOf('#') !== -1 ? fullUrl.indexOf('#') : fullUrl.indexOf('access_token') - 1;
+          const extractedHash = fullUrl.substring(hashStart);
+          
+          console.log('Extracted hash from URL:', extractedHash.substring(0, 20) + '...');
+          
+          // Temporarily set it as window.location.hash for processing
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, document.title, extractedHash);
+            
+            // Now try parsing with our manual method
+            const session = await parseAuthHashFromUrl();
+            
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+            
+            if (session) {
+              return session;
+            }
+          }
+        }
+      } else {
+        // Standard parse attempt
+        const session = await parseAuthHashFromUrl();
+        if (session) {
+          return session;
         }
       }
     }
     
-    // If direct parsing fails, try the built-in method
-    console.log('Direct parsing failed, trying built-in getSession method');
-    const { data, error } = await supabase.auth.getSession();
+    // Fallback to getting current session again in case anything changed
+    const { data: finalCheck } = await supabase.auth.getSession();
+    return finalCheck.session;
     
-    if (!error && data.session) {
-      console.log('Built-in getSession successful, user authenticated');
-      isProcessingHash = false;
-      return data.session;
-    }
-    
-    console.error('All auth hash processing methods failed');
-    isProcessingHash = false;
-    return null;
   } catch (error) {
-    console.error('Error processing auth hash:', error);
-    toast({
-      variant: "destructive",
-      title: "Authentication error",
-      description: "An error occurred while processing your login. Please try again.",
-    });
-    isProcessingHash = false;
+    console.error('Error in processAuthHash:', error);
     return null;
   }
 };

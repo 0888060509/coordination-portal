@@ -414,13 +414,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       
       console.log("Initiating Google login");
+      
+      // Store a state value for CSRF protection
+      const state = storeOAuthState();
+      
+      // Use the redirectTo to ensure the proper page is loaded after login
+      // Explicitly set the full URL to avoid any relative path issues
+      const redirectUrl = `${window.location.origin}/dashboard`;
+      console.log("Setting redirect URL:", redirectUrl);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/dashboard',
+          redirectTo: redirectUrl,
           queryParams: {
             prompt: 'select_account',
-          }
+            access_type: 'offline',  // Request a refresh token
+            state: state, // Add CSRF protection
+          },
+          skipBrowserRedirect: false, // Ensure browser is redirected
         },
       });
       
@@ -430,6 +442,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       // Auth state change will be handled by the listener
+      console.log("Google login initiated successfully, awaiting redirect");
     } catch (error) {
       console.error("Google login error:", error);
       const authError = error as AuthError;
