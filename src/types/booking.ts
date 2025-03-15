@@ -30,3 +30,15 @@ export interface CreateBookingData {
   start_time: Date;
   end_time: Date;
 }
+
+export interface RecurringPattern {
+  id: string;
+  user_id: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  interval: number;
+  days_of_week?: number[];
+  start_date: string;
+  end_date?: string;
+  max_occurrences?: number;
+  created_at: string;
+}
