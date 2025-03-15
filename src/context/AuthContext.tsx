@@ -1,6 +1,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User as SupabaseUser, Session, AuthError } from "@supabase/supabase-js";
@@ -56,7 +56,7 @@ const transformUser = async (supabaseUser: SupabaseUser | null, session: Session
     name: `${profile.first_name} ${profile.last_name}`.trim() || supabaseUser.email || '',
     firstName: profile.first_name || '',
     lastName: profile.last_name || '',
-    avatarUrl: profile.avatar_url || undefined,
+    avatarUrl: profile.avatar_url || supabaseUser.user_metadata.avatar_url,
     role: profile.is_admin ? 'admin' : 'user',
     department: profile.department || undefined,
     position: profile.position || undefined,
@@ -73,7 +73,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
+
+  // Handle hash fragment from OAuth redirects
+  useEffect(() => {
+    const handleHashFragment = async () => {
+      // Check if we have a hash in the URL (from OAuth redirect)
+      if (location.hash && location.hash.includes('access_token')) {
+        setIsLoading(true);
+        try {
+          // Get session from the URL hash
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) throw error;
+          
+          if (data.session) {
+            setSession(data.session);
+            await fetchProfile(data.session.user.id, data.session);
+            
+            // Clean up the URL by removing the hash fragment
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            toast.toast({
+              title: "Successfully signed in with Google",
+              description: "Welcome to MeetingMaster!",
+            });
+          }
+        } catch (error) {
+          console.error("Error processing OAuth redirect:", error);
+          toast.toast({
+            variant: "destructive",
+            title: "Authentication failed",
+            description: "Failed to authenticate with Google. Please try again.",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    handleHashFragment();
+  }, [location.hash, toast]);
 
   // Fetch user profile from profiles table
   const fetchProfile = async (userId: string, currentSession: Session | null) => {
@@ -86,7 +127,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      const transformedUser = await transformUser({ id: userId, email: data.email } as SupabaseUser, currentSession);
+      // Get user details from session
+      const sessionUser = currentSession?.user;
+      
+      // Create user object combining profile data and session data
+      const transformedUser: User = {
+        id: userId,
+        email: sessionUser?.email || data.email || '',
+        name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || sessionUser?.email || '',
+        firstName: data.first_name || '',
+        lastName: data.last_name || '',
+        avatarUrl: data.avatar_url || sessionUser?.user_metadata.avatar_url,
+        role: data.is_admin ? 'admin' : 'user',
+        department: data.department || undefined,
+        position: data.position || undefined,
+      };
+      
       setUser(transformedUser);
       setIsAdmin(data.is_admin || false);
     } catch (error) {
@@ -127,10 +183,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setIsLoading(true);
+        console.log("Auth state changed:", event, session);
         setSession(session);
         
         if (session?.user) {
+          setIsLoading(true);
           await fetchProfile(session.user.id, session);
         } else {
           setUser(null);
@@ -201,7 +258,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: window.location.origin + '/dashboard',
         },
       });
       

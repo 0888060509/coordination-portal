@@ -2,7 +2,7 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2 } from "lucide-react";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -16,8 +16,12 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-meeting-primary" />
-        <span className="ml-2 text-lg">Loading...</span>
+        <LoadingSpinner 
+          size="lg" 
+          color="primary" 
+          showText={true} 
+          text="Loading your account..." 
+        />
       </div>
     );
   }
