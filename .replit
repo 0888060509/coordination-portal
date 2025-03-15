@@ -1,0 +1,23 @@
+modules = ["nodejs-20", "web"]
+run = "npm run dev"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "npm run dev"]
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[workflows]
+
+[[workflows.workflow]]
+name = "Run Tests"
+author = 40392997
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm test"
