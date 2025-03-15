@@ -69,6 +69,7 @@ export const handleSupabaseError = (error: any): string => {
 export const parseAuthHashFromUrl = async () => {
   if (window.location.hash && window.location.hash.includes('access_token')) {
     try {
+      console.log('Found access_token in URL, processing...');
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {

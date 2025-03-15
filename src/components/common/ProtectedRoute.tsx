@@ -1,8 +1,9 @@
 
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/loading-spinner";
+import { toast } from "@/hooks/use-toast";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -12,6 +13,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { isAuthenticated, user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
+  const [authTimeout, setAuthTimeout] = useState(false);
 
   // Check for authentication hash in URL
   const hasAuthHash = location.hash && location.hash.includes('access_token');
@@ -23,9 +25,19 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     if (isLoading || hasAuthHash) {
       timeoutId = setTimeout(() => {
         console.log("Authentication loading timeout reached");
-        // We don't need to do anything here, the component will re-render
-        // with isLoading=false due to the useAuth hook
+        setAuthTimeout(true);
+        
+        if (hasAuthHash) {
+          // If we have auth hash but still loading, there might be a problem parsing it
+          toast({
+            variant: "destructive",
+            title: "Authentication problem",
+            description: "There was a problem processing your login. Please try again.",
+          });
+        }
       }, 10000); // 10 second timeout
+    } else {
+      setAuthTimeout(false);
     }
     
     return () => {
@@ -47,9 +59,11 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             Processing your sign-in, please wait...
           </p>
         )}
-        {isLoading && (
+        {(isLoading || authTimeout) && (
           <p className="mt-2 text-xs text-gray-400">
-            This is taking longer than expected. You may refresh the page if needed.
+            {authTimeout ? 
+              "This is taking longer than expected. You may refresh the page or try logging in again." :
+              "This is taking longer than expected. You may refresh the page if needed."}
           </p>
         )}
       </div>
