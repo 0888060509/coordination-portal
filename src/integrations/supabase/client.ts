@@ -16,6 +16,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     detectSessionInUrl: true,
     flowType: 'implicit', // This is important for OAuth with hash fragment handling
   },
+  global: {
+    fetch: (...args) => {
+      // Add custom fetch options here if needed
+      return fetch(...args);
+    },
+  },
 });
 
 // Helper function to handle Supabase errors consistently
@@ -32,4 +38,23 @@ export const handleSupabaseError = (error: any): string => {
   }
   
   return 'An unexpected error occurred. Please try again.';
+};
+
+// Helper function to parse auth hash from URL (for OAuth flows)
+export const parseAuthHashFromUrl = async () => {
+  if (window.location.hash && window.location.hash.includes('access_token')) {
+    const { data, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('Error parsing auth hash:', error);
+      return null;
+    }
+    
+    // Clean the URL by removing the hash
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    return data.session;
+  }
+  
+  return null;
 };

@@ -13,15 +13,23 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { isAuthenticated, user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
 
-  if (isLoading) {
+  // Check for authentication hash in URL
+  const hasAuthHash = location.hash && location.hash.includes('access_token');
+
+  if (isLoading || hasAuthHash) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex flex-col items-center justify-center h-screen">
         <LoadingSpinner 
           size="lg" 
           color="primary" 
           showText={true} 
-          text="Loading your account..." 
+          text={hasAuthHash ? "Completing authentication..." : "Loading your account..."} 
         />
+        {hasAuthHash && (
+          <p className="mt-4 text-sm text-gray-500">
+            Processing your sign-in, please wait...
+          </p>
+        )}
       </div>
     );
   }
