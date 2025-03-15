@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { 
   Toast,
@@ -126,6 +125,57 @@ function dispatch(action: Action) {
   });
 }
 
+// Standalone toast function that doesn't rely on hooks
+function toast(props: Omit<ToasterToast, "id">) {
+  const id = genId();
+
+  const update = (props: Partial<ToasterToast>) =>
+    dispatch({
+      type: actionTypes.UPDATE_TOAST,
+      toast: { ...props, id },
+    });
+  
+  const dismiss = () => dispatch({ 
+    type: actionTypes.DISMISS_TOAST, 
+    toastId: id 
+  });
+
+  dispatch({
+    type: actionTypes.ADD_TOAST,
+    toast: {
+      ...props,
+      id,
+      open: true,
+      onOpenChange: (open) => {
+        if (!open) dismiss();
+      },
+    },
+  });
+
+  return {
+    id,
+    dismiss,
+    update,
+  };
+}
+
+// Add variants as methods to the toast function
+toast.default = (props: Omit<ToasterToast, "id">) => {
+  return toast({
+    ...props,
+    duration: props.duration || 5000,
+  });
+};
+
+toast.dismiss = (toastId?: string) => {
+  dispatch({ type: actionTypes.DISMISS_TOAST, toastId });
+};
+
+toast.remove = (toastId?: string) => {
+  dispatch({ type: actionTypes.REMOVE_TOAST, toastId });
+};
+
+// Hook for components
 export function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
 
@@ -141,66 +191,12 @@ export function useToast() {
 
   return {
     ...state,
-    toast: (props: Omit<ToasterToast, "id">) => {
-      const id = genId();
-
-      const update = (props: Partial<ToasterToast>) =>
-        dispatch({
-          type: actionTypes.UPDATE_TOAST,
-          toast: { ...props, id },
-        });
-      const dismiss = () => dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id });
-
-      dispatch({
-        type: actionTypes.ADD_TOAST,
-        toast: {
-          ...props,
-          id,
-          open: true,
-          onOpenChange: (open) => {
-            if (!open) dismiss();
-          },
-        },
-      });
-
-      return {
-        id,
-        dismiss,
-        update,
-      };
-    },
-    dismiss: (toastId?: string) => dispatch({ type: actionTypes.DISMISS_TOAST, toastId }),
-    remove: (toastId?: string) => dispatch({ type: actionTypes.REMOVE_TOAST, toastId }),
+    toast,
+    dismiss: toast.dismiss,
+    remove: toast.remove,
   };
 }
 
-// Create a direct toast function implementation
-// This makes toast directly callable while still having additional methods
-const toastImpl = (props: Omit<ToasterToast, "id">) => {
-  const { toast } = useToast();
-  return toast(props);
-};
-
-// Create helper methods that call useToast() internally
-toastImpl.default = (props: Omit<ToasterToast, "id">) => {
-  const { toast } = useToast();
-  return toast({
-    ...props,
-    duration: props.duration || 5000,
-  });
-};
-
-toastImpl.dismiss = (toastId?: string) => {
-  const { dismiss } = useToast();
-  return dismiss(toastId);
-};
-
-toastImpl.remove = (toastId?: string) => {
-  const { remove } = useToast();
-  return remove(toastId);
-};
-
-// Export the toast function implementation
-export const toast = toastImpl;
+export { toast };
 
 export default useToast;
