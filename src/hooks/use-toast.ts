@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { 
   Toast,
@@ -173,13 +174,33 @@ export function useToast() {
   };
 }
 
-export const toast = {
-  ...useToast().toast,
-  // Enhanced toast with a default duration and automatic dismissal
-  default: (props: Omit<ToasterToast, "id">) => useToast().toast({
+// Create a direct toast function implementation
+// This makes toast directly callable while still having additional methods
+const toastImpl = (props: Omit<ToasterToast, "id">) => {
+  const { toast } = useToast();
+  return toast(props);
+};
+
+// Create helper methods that call useToast() internally
+toastImpl.default = (props: Omit<ToasterToast, "id">) => {
+  const { toast } = useToast();
+  return toast({
     ...props,
     duration: props.duration || 5000,
-  }),
+  });
 };
+
+toastImpl.dismiss = (toastId?: string) => {
+  const { dismiss } = useToast();
+  return dismiss(toastId);
+};
+
+toastImpl.remove = (toastId?: string) => {
+  const { remove } = useToast();
+  return remove(toastId);
+};
+
+// Export the toast function implementation
+export const toast = toastImpl;
 
 export default useToast;
