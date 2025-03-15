@@ -34,6 +34,7 @@ const RegisterPage = () => {
   const { register, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // If user is already authenticated, redirect to dashboard
   if (isAuthenticated && !isLoading) {
@@ -53,11 +54,13 @@ const RegisterPage = () => {
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
+    setError(null);
     try {
       await register(data.email, data.password, data.firstName, data.lastName);
       // The navigation will be handled by the registration flow
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration failed:", error);
+      setError(error.message || "Failed to create account. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -132,6 +135,12 @@ const RegisterPage = () => {
                 Fill in your details to get started
               </p>
             </div>
+
+            {error && (
+              <div className="mb-6 p-3 bg-red-100 text-red-700 rounded-md">
+                {error}
+              </div>
+            )}
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
