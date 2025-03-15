@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -38,7 +37,6 @@ const BookingsList = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Load bookings
   const loadBookings = async () => {
     try {
       setLoading(true);
@@ -56,7 +54,6 @@ const BookingsList = () => {
     loadBookings();
   }, []);
   
-  // Filter bookings by status/time
   const todayBookings = bookings.filter(booking => 
     booking.status === "confirmed" && 
     isToday(new Date(booking.start_time))
@@ -78,19 +75,16 @@ const BookingsList = () => {
     booking.status === "cancelled"
   );
   
-  // Handle booking selection
   const handleViewDetails = (booking: BookingWithDetails) => {
     setSelectedBooking(booking);
     setDetailsModalOpen(true);
   };
   
-  // Handle booking cancellation
   const handleCancelBooking = (booking: BookingWithDetails) => {
     setSelectedBooking(booking);
     setCancelModalOpen(true);
   };
   
-  // Confirm cancellation
   const confirmCancelBooking = async () => {
     if (!selectedBooking) return;
     
@@ -111,7 +105,6 @@ const BookingsList = () => {
     }
   };
   
-  // Render booking card
   const renderBookingCard = (booking: BookingWithDetails) => {
     const startTime = new Date(booking.start_time);
     const endTime = new Date(booking.end_time);
@@ -124,13 +117,12 @@ const BookingsList = () => {
         className={`overflow-hidden ${isPastBooking ? "bg-muted/50" : ""}`}
       >
         <CardContent className="p-4">
-          {/* Status badge and actions */}
           <div className="flex justify-between items-center mb-2">
             <Badge 
               variant={
                 booking.status === "cancelled" ? "destructive" : 
                 isPastBooking ? "outline" : 
-                isTodayBooking ? "success" : "default"
+                isTodayBooking ? "secondary" : "default"
               }
               className={
                 booking.status === "cancelled" ? "" : 
@@ -143,7 +135,6 @@ const BookingsList = () => {
                isTodayBooking ? "Today" : "Upcoming"}
             </Badge>
             
-            {/* Actions menu */}
             {!isPastBooking && booking.status !== "cancelled" && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -164,17 +155,14 @@ const BookingsList = () => {
             )}
           </div>
           
-          {/* Title */}
           <h3 className="text-lg font-semibold mb-2 truncate">
             {booking.title}
           </h3>
           
-          {/* Room name */}
           <p className="font-medium mb-2">
             {booking.room.name}
           </p>
           
-          {/* Date and time */}
           <div className="flex items-center mb-2">
             <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
             <p className="text-sm">
@@ -189,7 +177,6 @@ const BookingsList = () => {
             </p>
           </div>
           
-          {/* Location */}
           <div className="flex items-center mb-3">
             <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
             <p className="text-sm">
@@ -199,7 +186,6 @@ const BookingsList = () => {
             </p>
           </div>
           
-          {/* View details button for past/cancelled bookings */}
           {(isPastBooking || booking.status === "cancelled") && (
             <Button 
               variant="outline" 
@@ -215,7 +201,6 @@ const BookingsList = () => {
     );
   };
   
-  // Render empty state
   const renderEmptyState = (message: string, showButton: boolean = false) => (
     <div className="p-8 text-center bg-muted/50 rounded-md">
       <p className="text-lg">{message}</p>
@@ -264,7 +249,6 @@ const BookingsList = () => {
             </TabsTrigger>
           </TabsList>
           
-          {/* Today's bookings */}
           <TabsContent value="today">
             {todayBookings.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -275,7 +259,6 @@ const BookingsList = () => {
             )}
           </TabsContent>
           
-          {/* Upcoming bookings */}
           <TabsContent value="upcoming">
             {upcomingBookings.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -286,7 +269,6 @@ const BookingsList = () => {
             )}
           </TabsContent>
           
-          {/* Past bookings */}
           <TabsContent value="past">
             {pastBookings.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -297,7 +279,6 @@ const BookingsList = () => {
             )}
           </TabsContent>
           
-          {/* Cancelled bookings */}
           <TabsContent value="cancelled">
             {cancelledBookings.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -310,7 +291,6 @@ const BookingsList = () => {
         </Tabs>
       )}
       
-      {/* Booking details modal */}
       {selectedBooking && (
         <BookingDetailsModal
           isOpen={detailsModalOpen}
@@ -323,7 +303,6 @@ const BookingsList = () => {
         />
       )}
       
-      {/* Cancel booking confirmation modal */}
       {selectedBooking && (
         <CancelBookingModal
           isOpen={cancelModalOpen}
