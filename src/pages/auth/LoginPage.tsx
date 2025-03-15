@@ -39,14 +39,23 @@ const LoginPage = () => {
   // Get the page they were trying to access
   const from = location.state?.from?.pathname || "/dashboard";
 
-  // Reset submission state if the page is reloaded
+  // Reset submission state when unmounting
   useEffect(() => {
     return () => {
       setIsSubmitting(false);
     };
   }, []);
 
-  // Add a timeout to detect stalled login attempts
+  // Add a short delay for initial auth check to prevent flashing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialAuthCheck(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Add timeout to detect stalled login attempts
   useEffect(() => {
     let loginTimeout: NodeJS.Timeout;
     
@@ -60,7 +69,7 @@ const LoginPage = () => {
           title: "Login timeout",
           description: "Your login request took too long. Please try again.",
         });
-      }, 8000); // 8 second timeout
+      }, 10000); // Increased from 8s to 10s to give more time
     }
     
     return () => {
@@ -86,9 +95,11 @@ const LoginPage = () => {
               title: "Successfully signed in",
               description: "Welcome to MeetingMaster!",
             });
-            navigate('/dashboard');
+            // Small delay before navigation to ensure state is updated
+            setTimeout(() => navigate('/dashboard'), 500);
           } else {
             setProcessingOAuth(false);
+            setAuthError("Failed to complete authentication. Please try again.");
           }
         } catch (error) {
           console.error("Error processing OAuth in LoginPage:", error);
@@ -99,13 +110,6 @@ const LoginPage = () => {
       
       processAuth();
     }
-    
-    // Clear initial auth check after a short delay
-    const timer = setTimeout(() => {
-      setInitialAuthCheck(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
   }, [location.hash, navigate]);
 
   // If user is already authenticated, redirect to dashboard
@@ -116,7 +120,7 @@ const LoginPage = () => {
     if (isAuthenticated && !authLoading && !processingOAuth && !initialAuthCheck) {
       redirectTimer = setTimeout(() => {
         navigate(from, { replace: true });
-      }, 100);
+      }, 500);
     }
     
     return () => {
@@ -149,11 +153,19 @@ const LoginPage = () => {
       }
       
       console.log("Login successful, result:", result);
-      // Login successful, navigation will be handled by auth state change listener
+      // Navigation will be handled by auth state change listener
+      setTimeout(() => {
+        // If after successful login we're still on login page, force navigate
+        if (window.location.pathname.includes('login')) {
+          navigate('/dashboard', { replace: true });
+        }
+      }, 2000);
     } catch (error) {
       console.error("Login failed:", error);
-      setAuthError("Invalid email or password. Please try again.");
-      setIsSubmitting(false); // Important: Reset submission state on error
+      setAuthError(typeof error === 'string' ? error : 
+        error instanceof Error ? error.message : 
+        "Invalid email or password. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -298,6 +310,7 @@ const LoginPage = () => {
                           type="email"
                           {...field}
                           disabled={isSubmitting}
+                          autoComplete="email"
                         />
                       </FormControl>
                       <FormMessage />
@@ -317,6 +330,7 @@ const LoginPage = () => {
                           type="password"
                           {...field}
                           disabled={isSubmitting}
+                          autoComplete="current-password"
                         />
                       </FormControl>
                       <FormMessage />

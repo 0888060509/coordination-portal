@@ -54,6 +54,12 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
         
         try {
           console.log("ProtectedRoute: Processing auth hash manually, attempt:", processingAttempts + 1);
+          
+          // Clear hash from URL first to prevent processing loops
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+          }
+          
           const session = await processAuthHash();
           
           if (!isMounted) return;
@@ -152,6 +158,41 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           description: "Please wait while we try again...",
         });
         
+        // Clear hash from URL first to prevent processing loops
+        const currentHash = location.hash;
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        }
+        
+        // Process the hash manually since the auth hash was cleared from URL
+        const params = new URLSearchParams(currentHash.substring(1));
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        
+        if (accessToken) {
+          const expiresIn = params.get('expires_in');
+          const expiresAt = expiresIn ? Math.floor(Date.now() / 1000) + parseInt(expiresIn, 10) : undefined;
+          
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || null,
+            expires_in: expiresIn ? parseInt(expiresIn, 10) : 3600,
+            expires_at: expiresAt,
+            token_type: params.get('token_type') || 'bearer'
+          });
+          
+          if (error || !data.session) {
+            throw error || new Error("No session returned");
+          }
+          
+          toast({
+            title: "Authentication successful",
+            description: "You are now logged in.",
+          });
+          return;
+        }
+        
+        // If we don't have access token or the above failed, try regular process
         const session = await processAuthHash();
         if (!session) {
           toast({

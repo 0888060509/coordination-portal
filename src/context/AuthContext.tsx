@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -151,7 +152,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log("Fetching profile for user:", userId);
       
-      // Try to get user from session first
       if (!currentSession) {
         console.error('No session available for fetchProfile');
         setIsLoading(false);
@@ -201,8 +201,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // If that fails, try manual extraction as a fallback
           console.log("Custom handler failed, trying manual extraction");
           
+          // Capture the hash before clearing it
+          const currentHash = location.hash;
+          
+          // Clear hash from URL immediately to prevent loops
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+          }
+          
           // Extract access token from hash
-          const params = new URLSearchParams(location.hash.substring(1));
+          const params = new URLSearchParams(currentHash.substring(1));
           const accessToken = params.get('access_token');
           const refreshToken = params.get('refresh_token');
           
@@ -211,12 +219,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           
           // Try manual session setup with the tokens from the URL
-          if (accessToken && refreshToken) {
+          if (accessToken) {
             try {
               console.log("Trying manual session setup with tokens");
+              
+              // Extract more parameters
+              const expiresIn = params.get('expires_in');
+              const expiresAt = expiresIn ? Math.floor(Date.now() / 1000) + parseInt(expiresIn, 10) : undefined;
+              
               const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
                 access_token: accessToken,
-                refresh_token: refreshToken
+                refresh_token: refreshToken || null,
+                expires_in: expiresIn ? parseInt(expiresIn, 10) : 3600,
+                expires_at: expiresAt,
+                token_type: params.get('token_type') || 'bearer'
               });
               
               if (sessionError) {
@@ -227,9 +243,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 console.log("Manual session setup successful");
                 setSession(sessionData.session);
                 await fetchProfile(sessionData.session.user.id, sessionData.session);
-                
-                // Clean up the URL
-                window.history.replaceState({}, document.title, window.location.pathname);
                 
                 toast({
                   title: "Successfully signed in with Google",
@@ -306,7 +319,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             title: "Successfully signed in",
             description: "Welcome to MeetingMaster!",
           });
-          navigate('/dashboard');
+          // Wait for a short time to make sure the state is updated
+          setTimeout(() => navigate('/dashboard'), 500);
         }
         
         if (event === 'SIGNED_OUT') {
@@ -357,12 +371,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (data.session?.user) {
         await fetchProfile(data.session.user.id, data.session);
+        
+        toast({
+          title: "Login successful",
+          description: "Welcome back to MeetingMaster!",
+        });
+        
+        // Add a delay to ensure the profile has been fetched before proceeding
+        setTimeout(() => {
+          // Force navigate to dashboard after successful login
+          navigate('/dashboard', { replace: true });
+        }, 500);
       }
-      
-      toast({
-        title: "Login successful",
-        description: "Welcome back to MeetingMaster!",
-      });
       
       return { data };
     } catch (error) {
