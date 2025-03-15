@@ -236,7 +236,26 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_room_availability: {
+        Args: {
+          room_id: string
+          start_time: string
+          end_time: string
+          exclude_booking_id?: string
+        }
+        Returns: boolean
+      }
+      create_booking: {
+        Args: {
+          p_room_id: string
+          p_user_id: string
+          p_title: string
+          p_description: string
+          p_start_time: string
+          p_end_time: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
