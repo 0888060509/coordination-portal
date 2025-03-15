@@ -51,7 +51,7 @@ const LoginPage = () => {
     const timer = setTimeout(() => {
       setInitialAuthCheck(false);
     }, 1000);
-    
+
     return () => clearTimeout(timer);
   }, []);
 
@@ -59,10 +59,10 @@ const LoginPage = () => {
   useEffect(() => {
     let loginTimeout: NodeJS.Timeout;
     let navigationTimeout: NodeJS.Timeout;
-    
+
     if (isSubmitting && !authLoading) {
       console.log("Login attempt in progress, setting timeout");
-      
+
       loginTimeout = setTimeout(() => {
         console.log("Login attempt timed out after 10s");
         // Instead of giving up, try to check the session status
@@ -79,7 +79,7 @@ const LoginPage = () => {
               navigate('/dashboard', { replace: true });
               return;
             }
-            
+
             // If no session, show the timeout message
             setIsSubmitting(false);
             setAuthError("Login attempt timed out. Please try again.");
@@ -94,22 +94,22 @@ const LoginPage = () => {
             setAuthError("Login attempt timed out. Please try again.");
           }
         };
-        
+
         checkSessionStatus();
       }, 10000);
     }
-    
+
     // If authenticated but not navigating, force navigate after a delay
     if (isAuthenticated && !initialAuthCheck && !forcingNavigation) {
       setForcingNavigation(true);
       console.log("User is authenticated, forcing navigation to dashboard");
-      
+
       navigationTimeout = setTimeout(() => {
         console.log("Executing forced navigation to dashboard");
         navigate(from, { replace: true });
       }, 1500);
     }
-    
+
     return () => {
       if (loginTimeout) clearTimeout(loginTimeout);
       if (navigationTimeout) clearTimeout(navigationTimeout);
@@ -123,23 +123,23 @@ const LoginPage = () => {
         try {
           setProcessingOAuth(true);
           setAuthError(null);
-          
+
           console.log("Login page: Processing OAuth hash");
           // First clear the hash to prevent repeated processing
           const currentHash = location.hash;
           if (window.history && window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           }
-          
+
           const session = await processAuthHash();
-          
+
           if (session) {
             console.log("Login page: OAuth processing successful");
             toast({
               title: "Successfully signed in",
               description: "Welcome to MeetingMaster!",
             });
-            
+
             // Small delay before navigation to ensure state is updated
             setTimeout(() => {
               console.log("Navigating to dashboard after OAuth processing");
@@ -147,19 +147,19 @@ const LoginPage = () => {
             }, 1000);
           } else {
             console.error("Failed to process OAuth hash");
-            
+
             // Try manual extraction as fallback
             try {
               console.log("Attempting manual extraction of tokens from hash");
               const params = new URLSearchParams(currentHash.substring(1));
               const accessToken = params.get('access_token');
               const refreshToken = params.get('refresh_token');
-              
+
               if (accessToken) {
                 console.log("Found access token, attempting manual session setup");
                 const expiresIn = params.get('expires_in');
                 const expiresAt = expiresIn ? Math.floor(Date.now() / 1000) + parseInt(expiresIn, 10) : undefined;
-                
+
                 const { data, error } = await supabase.auth.setSession({
                   access_token: accessToken,
                   refresh_token: refreshToken || null,
@@ -167,18 +167,18 @@ const LoginPage = () => {
                   ...(expiresAt ? { expires_at: expiresAt } as any : {}),
                   token_type: params.get('token_type') || 'bearer'
                 });
-                
+
                 if (error) {
                   throw error;
                 }
-                
+
                 if (data.session) {
                   console.log("Manual session setup successful");
                   toast({
                     title: "Authentication successful",
                     description: "You are now logged in.",
                   });
-                  
+
                   setTimeout(() => {
                     navigate('/dashboard', { replace: true });
                   }, 1000);
@@ -188,7 +188,7 @@ const LoginPage = () => {
             } catch (manualError) {
               console.error("Manual token extraction failed:", manualError);
             }
-            
+
             setProcessingOAuth(false);
             setAuthError("Failed to complete authentication. Please try again.");
           }
@@ -198,7 +198,7 @@ const LoginPage = () => {
           setProcessingOAuth(false);
         }
       };
-      
+
       processAuth();
     }
   }, [location.hash, navigate]);
@@ -207,17 +207,17 @@ const LoginPage = () => {
   // Add a delay to prevent immediate redirect which can cause flickering
   useEffect(() => {
     let redirectTimer: NodeJS.Timeout;
-    
+
     if (isAuthenticated && !authLoading && !processingOAuth && !initialAuthCheck && !forcingNavigation) {
       console.log("User is authenticated, scheduling navigation");
       setForcingNavigation(true);
-      
+
       redirectTimer = setTimeout(() => {
         console.log("Executing navigation to", from);
         navigate(from, { replace: true });
       }, 1000);
     }
-    
+
     return () => {
       if (redirectTimer) clearTimeout(redirectTimer);
     };
@@ -233,30 +233,25 @@ const LoginPage = () => {
 
   const onSubmit = async (data: FormValues) => {
     if (isSubmitting) return; // Prevent multiple submissions
-    
+
     setIsSubmitting(true);
     setAuthError(null);
     setLoginAttempts(prev => prev + 1);
-    
+
     try {
       console.log("Submitting login form with data:", { email: data.email, attemptCount: loginAttempts });
       const result = await login(data.email, data.password);
-      
+
       if (result.error) {
         console.error("Login error returned:", result.error);
         throw result.error;
       }
-      
+
       console.log("Login successful, result:", result);
-      
-      // Navigation will be handled by auth state change listener
-      // Add a backup navigation just in case
-      setTimeout(() => {
-        if (window.location.pathname.includes('login')) {
-          console.log("Forcing navigation to dashboard after successful login");
-          navigate('/dashboard', { replace: true });
-        }
-      }, 2000);
+
+      // Force navigation after successful login
+      navigate(from, { replace: true });
+
     } catch (error) {
       console.error("Login failed:", error);
       setAuthError(typeof error === 'string' ? error : 
@@ -268,7 +263,7 @@ const LoginPage = () => {
 
   const handleGoogleLogin = async () => {
     if (isSubmitting || processingOAuth) return; // Prevent actions when already processing
-    
+
     setAuthError(null);
     try {
       await loginWithGoogle();
