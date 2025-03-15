@@ -121,6 +121,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log("Fetching profile for user:", userId);
       
+      let profileData;
+      
+      // First, try to fetch existing profile
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -129,12 +132,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) {
         console.error("Error fetching profile:", error);
-        throw error;
-      }
-      
-      if (!data) {
+        
+        // If error is not "not found", throw it
+        if (!error.message.includes("No rows found")) {
+          throw error;
+        }
+        
+        // If profile not found, create one
         console.log("No profile found, creating one...");
-        // Profile doesn't exist, create one
         const sessionUser = currentSession?.user;
         const firstName = sessionUser?.user_metadata?.full_name?.split(' ')?.[0] || '';
         const lastName = sessionUser?.user_metadata?.full_name?.split(' ')?.slice(1)?.join(' ') || '';
@@ -161,12 +166,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .eq('id', userId)
           .single();
           
-        if (fetchError || !newProfile) {
+        if (fetchError) {
           console.error("Error fetching new profile:", fetchError);
           throw fetchError;
         }
         
-        data = newProfile;
+        profileData = newProfile;
+      } else {
+        // Use existing profile data
+        profileData = data;
       }
       
       // Get user details from session
@@ -175,18 +183,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Create user object combining profile data and session data
       const transformedUser: User = {
         id: userId,
-        email: sessionUser?.email || data.email || '',
-        name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || sessionUser?.email || '',
-        firstName: data.first_name || '',
-        lastName: data.last_name || '',
-        avatarUrl: data.avatar_url || sessionUser?.user_metadata?.avatar_url,
-        role: data.is_admin ? 'admin' : 'user',
-        department: data.department || undefined,
-        position: data.position || undefined,
+        email: sessionUser?.email || profileData.email || '',
+        name: `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || sessionUser?.email || '',
+        firstName: profileData.first_name || '',
+        lastName: profileData.last_name || '',
+        avatarUrl: profileData.avatar_url || sessionUser?.user_metadata?.avatar_url,
+        role: profileData.is_admin ? 'admin' : 'user',
+        department: profileData.department || undefined,
+        position: profileData.position || undefined,
       };
       
       setUser(transformedUser);
-      setIsAdmin(data.is_admin || false);
+      setIsAdmin(profileData.is_admin || false);
     } catch (error) {
       console.error('Error in profile flow:', error);
       setUser(null);
