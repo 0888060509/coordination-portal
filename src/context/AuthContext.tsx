@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -24,7 +23,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ error?: AuthError }>;
   loginWithGoogle: () => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -38,29 +37,80 @@ interface AuthContextType {
 const transformUser = async (supabaseUser: SupabaseUser | null, session: Session | null): Promise<User | null> => {
   if (!supabaseUser) return null;
   
-  // Fetch the user's profile from our profiles table
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', supabaseUser.id)
-    .single();
-  
-  if (error || !profile) {
-    console.error('Error fetching user profile:', error);
+  try {
+    // Fetch the user's profile from our profiles table
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', supabaseUser.id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+    
+    if (!profile) {
+      console.log('No profile found for user, creating one...');
+      // Create a profile for this user
+      const firstName = supabaseUser.user_metadata?.full_name?.split(' ')?.[0] || '';
+      const lastName = supabaseUser.user_metadata?.full_name?.split(' ')?.slice(1)?.join(' ') || '';
+      
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: supabaseUser.id,
+          first_name: firstName,
+          last_name: lastName,
+          email: supabaseUser.email || '',
+          avatar_url: supabaseUser.user_metadata?.avatar_url || '',
+        });
+        
+      if (insertError) {
+        console.error('Error creating profile:', insertError);
+        return null;
+      }
+      
+      // Fetch the newly created profile
+      const { data: newProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+        
+      if (fetchError || !newProfile) {
+        console.error('Error fetching new profile:', fetchError);
+        return null;
+      }
+      
+      return {
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        name: `${newProfile.first_name} ${newProfile.last_name}`.trim() || supabaseUser.email || '',
+        firstName: newProfile.first_name || '',
+        lastName: newProfile.last_name || '',
+        avatarUrl: newProfile.avatar_url || supabaseUser.user_metadata?.avatar_url,
+        role: newProfile.is_admin ? 'admin' : 'user',
+        department: newProfile.department || undefined,
+        position: newProfile.position || undefined,
+      };
+    }
+    
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      name: `${profile.first_name} ${profile.last_name}`.trim() || supabaseUser.email || '',
+      firstName: profile.first_name || '',
+      lastName: profile.last_name || '',
+      avatarUrl: profile.avatar_url || supabaseUser.user_metadata?.avatar_url,
+      role: profile.is_admin ? 'admin' : 'user',
+      department: profile.department || undefined,
+      position: profile.position || undefined,
+    };
+  } catch (error) {
+    console.error('Error in transformUser:', error);
     return null;
   }
-  
-  return {
-    id: supabaseUser.id,
-    email: supabaseUser.email || '',
-    name: `${profile.first_name} ${profile.last_name}`.trim() || supabaseUser.email || '',
-    firstName: profile.first_name || '',
-    lastName: profile.last_name || '',
-    avatarUrl: profile.avatar_url || supabaseUser.user_metadata.avatar_url,
-    role: profile.is_admin ? 'admin' : 'user',
-    department: profile.department || undefined,
-    position: profile.position || undefined,
-  };
 };
 
 // Initial context
@@ -76,6 +126,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   const toast = useToast();
 
+  // Fetch user profile from profiles table with better error handling
+  const fetchProfile = async (userId: string, currentSession: Session | null) => {
+    try {
+      console.log("Fetching profile for user:", userId);
+      
+      // Try to get user from session first
+      if (!currentSession) {
+        console.error('No session available for fetchProfile');
+        setIsLoading(false);
+        return;
+      }
+      
+      const userData = await transformUser(currentSession.user, currentSession);
+      
+      if (userData) {
+        setUser(userData);
+        setIsAdmin(userData.role === 'admin');
+      } else {
+        console.error('Could not transform user data');
+        setUser(null);
+        setIsAdmin(false);
+      }
+    } catch (error) {
+      console.error('Error in profile flow:', error);
+      setUser(null);
+      setIsAdmin(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle hash fragment from OAuth redirects
   useEffect(() => {
     const handleHashFragment = async () => {
@@ -83,12 +164,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (location.hash && location.hash.includes('access_token')) {
         setIsLoading(true);
         try {
+          console.log("Processing OAuth callback...");
+          
           // Get session from the URL hash
           const { data, error } = await supabase.auth.getSession();
           
-          if (error) throw error;
+          if (error) {
+            console.error("Error getting session:", error);
+            throw error;
+          }
           
           if (data.session) {
+            console.log("Got session:", data.session.user.id);
             setSession(data.session);
             await fetchProfile(data.session.user.id, data.session);
             
@@ -99,6 +186,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               title: "Successfully signed in with Google",
               description: "Welcome to MeetingMaster!",
             });
+            
+            navigate('/dashboard');
+          } else {
+            console.error("No session in OAuth callback");
+            setIsLoading(false);
           }
         } catch (error) {
           console.error("Error processing OAuth redirect:", error);
@@ -107,102 +199,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             title: "Authentication failed",
             description: "Failed to authenticate with Google. Please try again.",
           });
-        } finally {
           setIsLoading(false);
+          navigate('/login');
         }
       }
     };
     
     handleHashFragment();
-  }, [location.hash, toast]);
-
-  // Fetch user profile from profiles table
-  const fetchProfile = async (userId: string, currentSession: Session | null) => {
-    try {
-      console.log("Fetching profile for user:", userId);
-      
-      let profileData;
-      
-      // First, try to fetch existing profile
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      if (error) {
-        console.error("Error fetching profile:", error);
-        
-        // If error is not "not found", throw it
-        if (!error.message.includes("No rows found")) {
-          throw error;
-        }
-        
-        // If profile not found, create one
-        console.log("No profile found, creating one...");
-        const sessionUser = currentSession?.user;
-        const firstName = sessionUser?.user_metadata?.full_name?.split(' ')?.[0] || '';
-        const lastName = sessionUser?.user_metadata?.full_name?.split(' ')?.slice(1)?.join(' ') || '';
-        
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            first_name: firstName,
-            last_name: lastName,
-            email: sessionUser?.email || '',
-            avatar_url: sessionUser?.user_metadata?.avatar_url || '',
-          });
-          
-        if (insertError) {
-          console.error("Error creating profile:", insertError);
-          throw insertError;
-        }
-        
-        // Fetch the newly created profile
-        const { data: newProfile, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-          
-        if (fetchError) {
-          console.error("Error fetching new profile:", fetchError);
-          throw fetchError;
-        }
-        
-        profileData = newProfile;
-      } else {
-        // Use existing profile data
-        profileData = data;
-      }
-      
-      // Get user details from session
-      const sessionUser = currentSession?.user;
-      
-      // Create user object combining profile data and session data
-      const transformedUser: User = {
-        id: userId,
-        email: sessionUser?.email || profileData.email || '',
-        name: `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || sessionUser?.email || '',
-        firstName: profileData.first_name || '',
-        lastName: profileData.last_name || '',
-        avatarUrl: profileData.avatar_url || sessionUser?.user_metadata?.avatar_url,
-        role: profileData.is_admin ? 'admin' : 'user',
-        department: profileData.department || undefined,
-        position: profileData.position || undefined,
-      };
-      
-      setUser(transformedUser);
-      setIsAdmin(profileData.is_admin || false);
-    } catch (error) {
-      console.error('Error in profile flow:', error);
-      setUser(null);
-      setIsAdmin(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [location.hash, navigate, toast]);
 
   // Check if the user is already logged in
   useEffect(() => {
@@ -288,6 +292,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         title: "Login successful",
         description: "Welcome back to MeetingMaster!",
       });
+      
+      return { data };
     } catch (error) {
       console.error("Login error:", error);
       const authError = error as AuthError;
@@ -298,7 +304,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: authError.message || "Please check your credentials and try again.",
       });
       setIsLoading(false);
-      throw error;
+      return { error: authError };
     }
   };
 
@@ -309,6 +315,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         provider: 'google',
         options: {
           redirectTo: window.location.origin + '/dashboard',
+          queryParams: {
+            prompt: 'select_account',
+          }
         },
       });
       

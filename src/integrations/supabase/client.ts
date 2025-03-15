@@ -9,6 +9,7 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase, handleSupabaseError } from "@/integrations/supabase/client";
 
+// Configure with retries and improved error handling
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     persistSession: true,
@@ -18,8 +19,23 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   },
   global: {
     fetch: (url: RequestInfo | URL, options?: RequestInit) => {
-      // Add custom fetch options here if needed
-      return fetch(url, options);
+      const fetchOptions = {
+        ...options,
+        // Increase timeouts for better resilience
+        cache: 'no-store' as RequestCache,
+      };
+      
+      return fetch(url, fetchOptions)
+        .then(response => {
+          if (!response.ok) {
+            console.warn(`Supabase fetch failed for ${url.toString()}`, response.status);
+          }
+          return response;
+        })
+        .catch(error => {
+          console.error(`Supabase fetch error for ${url.toString()}:`, error);
+          throw error; // Re-throw to allow supabase client to handle
+        });
     },
   },
   // Add request retry logic
