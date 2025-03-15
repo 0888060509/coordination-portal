@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { supabase, handleSupabaseError, processAuthHash } from "@/integrations/supabase/client";
+import { supabase, handleSupabaseError, processAuthHash, storeOAuthState } from "@/integrations/supabase/client";
 import { User as SupabaseUser, Session, AuthError } from "@supabase/supabase-js";
 
 // Types
