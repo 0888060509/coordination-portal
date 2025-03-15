@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -17,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { processAuthHash } from "@/integrations/supabase/client";
+import { processAuthHash, supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -35,6 +34,7 @@ const LoginPage = () => {
   const [processingOAuth, setProcessingOAuth] = useState(false);
   const [initialAuthCheck, setInitialAuthCheck] = useState(true);
   const [loginAttempts, setLoginAttempts] = useState(0);
+  const [forcingNavigation, setForcingNavigation] = useState(false);
 
   // Get the page they were trying to access
   const from = location.state?.from?.pathname || "/dashboard";
@@ -55,31 +55,69 @@ const LoginPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Add timeout to detect stalled login attempts
+  // Add timeout to detect stalled login attempts with automatic retry
   useEffect(() => {
     let loginTimeout: NodeJS.Timeout;
+    let navigationTimeout: NodeJS.Timeout;
     
     if (isSubmitting && !authLoading) {
+      console.log("Login attempt in progress, setting timeout");
+      
       loginTimeout = setTimeout(() => {
-        console.log("Login attempt timed out");
-        setIsSubmitting(false);
-        setAuthError("Login attempt timed out. Please try again.");
-        toast({
-          variant: "destructive",
-          title: "Login timeout",
-          description: "Your login request took too long. Please try again.",
-        });
-      }, 10000); // Increased from 8s to 10s to give more time
+        console.log("Login attempt timed out after 10s");
+        // Instead of giving up, try to check the session status
+        const checkSessionStatus = async () => {
+          try {
+            console.log("Checking session status after timeout");
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+              console.log("Session exists despite timeout, navigating to dashboard");
+              toast({
+                title: "Login successful",
+                description: "You are now logged in.",
+              });
+              navigate('/dashboard', { replace: true });
+              return;
+            }
+            
+            // If no session, show the timeout message
+            setIsSubmitting(false);
+            setAuthError("Login attempt timed out. Please try again.");
+            toast({
+              variant: "destructive",
+              title: "Login timeout",
+              description: "Your login request took too long. Please try again.",
+            });
+          } catch (error) {
+            console.error("Error checking session after timeout:", error);
+            setIsSubmitting(false);
+            setAuthError("Login attempt timed out. Please try again.");
+          }
+        };
+        
+        checkSessionStatus();
+      }, 10000);
+    }
+    
+    // If authenticated but not navigating, force navigate after a delay
+    if (isAuthenticated && !initialAuthCheck && !forcingNavigation) {
+      setForcingNavigation(true);
+      console.log("User is authenticated, forcing navigation to dashboard");
+      
+      navigationTimeout = setTimeout(() => {
+        console.log("Executing forced navigation to dashboard");
+        navigate(from, { replace: true });
+      }, 1500);
     }
     
     return () => {
       if (loginTimeout) clearTimeout(loginTimeout);
+      if (navigationTimeout) clearTimeout(navigationTimeout);
     };
-  }, [isSubmitting, authLoading]);
+  }, [isSubmitting, authLoading, isAuthenticated, initialAuthCheck, navigate, from, forcingNavigation]);
 
-  // Check for authentication hash on mount
+  // Check for authentication hash on mount with enhanced error handling
   useEffect(() => {
-    // Only run if we have an auth hash in the URL
     if (location.hash && location.hash.includes('access_token')) {
       const processAuth = async () => {
         try {
@@ -87,6 +125,12 @@ const LoginPage = () => {
           setAuthError(null);
           
           console.log("Login page: Processing OAuth hash");
+          // First clear the hash to prevent repeated processing
+          const currentHash = location.hash;
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+          }
+          
           const session = await processAuthHash();
           
           if (session) {
@@ -95,9 +139,56 @@ const LoginPage = () => {
               title: "Successfully signed in",
               description: "Welcome to MeetingMaster!",
             });
+            
             // Small delay before navigation to ensure state is updated
-            setTimeout(() => navigate('/dashboard'), 500);
+            setTimeout(() => {
+              console.log("Navigating to dashboard after OAuth processing");
+              navigate('/dashboard', { replace: true });
+            }, 1000);
           } else {
+            console.error("Failed to process OAuth hash");
+            
+            // Try manual extraction as fallback
+            try {
+              console.log("Attempting manual extraction of tokens from hash");
+              const params = new URLSearchParams(currentHash.substring(1));
+              const accessToken = params.get('access_token');
+              const refreshToken = params.get('refresh_token');
+              
+              if (accessToken) {
+                console.log("Found access token, attempting manual session setup");
+                const expiresIn = params.get('expires_in');
+                const expiresAt = expiresIn ? Math.floor(Date.now() / 1000) + parseInt(expiresIn, 10) : undefined;
+                
+                const { data, error } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken || null,
+                  ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } as any : {}),
+                  ...(expiresAt ? { expires_at: expiresAt } as any : {}),
+                  token_type: params.get('token_type') || 'bearer'
+                });
+                
+                if (error) {
+                  throw error;
+                }
+                
+                if (data.session) {
+                  console.log("Manual session setup successful");
+                  toast({
+                    title: "Authentication successful",
+                    description: "You are now logged in.",
+                  });
+                  
+                  setTimeout(() => {
+                    navigate('/dashboard', { replace: true });
+                  }, 1000);
+                  return;
+                }
+              }
+            } catch (manualError) {
+              console.error("Manual token extraction failed:", manualError);
+            }
+            
             setProcessingOAuth(false);
             setAuthError("Failed to complete authentication. Please try again.");
           }
@@ -117,16 +208,20 @@ const LoginPage = () => {
   useEffect(() => {
     let redirectTimer: NodeJS.Timeout;
     
-    if (isAuthenticated && !authLoading && !processingOAuth && !initialAuthCheck) {
+    if (isAuthenticated && !authLoading && !processingOAuth && !initialAuthCheck && !forcingNavigation) {
+      console.log("User is authenticated, scheduling navigation");
+      setForcingNavigation(true);
+      
       redirectTimer = setTimeout(() => {
+        console.log("Executing navigation to", from);
         navigate(from, { replace: true });
-      }, 500);
+      }, 1000);
     }
     
     return () => {
       if (redirectTimer) clearTimeout(redirectTimer);
     };
-  }, [isAuthenticated, authLoading, processingOAuth, navigate, from, initialAuthCheck]);
+  }, [isAuthenticated, authLoading, processingOAuth, navigate, from, initialAuthCheck, forcingNavigation]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -153,10 +248,12 @@ const LoginPage = () => {
       }
       
       console.log("Login successful, result:", result);
+      
       // Navigation will be handled by auth state change listener
+      // Add a backup navigation just in case
       setTimeout(() => {
-        // If after successful login we're still on login page, force navigate
         if (window.location.pathname.includes('login')) {
+          console.log("Forcing navigation to dashboard after successful login");
           navigate('/dashboard', { replace: true });
         }
       }, 2000);
