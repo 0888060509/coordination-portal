@@ -24,12 +24,19 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
 
   // Process auth hash if present
   useEffect(() => {
+    let isMounted = true;
+    
     const handleAuthHash = async () => {
       if (hasAuthHash && !isAuthenticated && !processingAuth && processingAttempts < 3) {
+        if (!isMounted) return;
+        
         setProcessingAuth(true);
         try {
           console.log("ProtectedRoute: Processing auth hash manually, attempt:", processingAttempts + 1);
           const session = await processAuthHash();
+          
+          if (!isMounted) return;
+          
           if (!session) {
             console.error("Failed to process auth hash");
             setProcessingAttempts(prev => prev + 1);
@@ -43,6 +50,8 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             // No need to manually update the state, the auth listener will handle it
           }
         } catch (error) {
+          if (!isMounted) return;
+          
           console.error("Error processing auth hash:", error);
           setProcessingAttempts(prev => prev + 1);
           toast({
@@ -51,19 +60,27 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             description: "Failed to complete authentication. Please try again.",
           });
         } finally {
-          setProcessingAuth(false);
+          if (isMounted) {
+            setProcessingAuth(false);
+          }
         }
       }
     };
 
     handleAuthHash();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts, navigate]);
 
-  // Add timeout for authentication loading
+  // Add timeout for authentication loading with progressive feedback
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
+    let longTimeoutId: NodeJS.Timeout;
     
     if (isLoading || hasAuthHash || processingAuth) {
+      // Initial timeout - show retry options
       timeoutId = setTimeout(() => {
         console.log("Authentication loading timeout reached");
         setAuthTimeout(true);
@@ -72,26 +89,43 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           // If we have auth hash but still loading, there might be a problem parsing it
           toast({
             variant: "destructive",
-            title: "Authentication problem",
-            description: "There was a problem processing your login. Please try again.",
+            title: "Authentication taking longer than expected",
+            description: "You can try again or go back to login page.",
           });
         }
-      }, 7000); // 7 second timeout (reduced from 10 seconds)
+      }, 5000); // 5 second timeout
+      
+      // Longer timeout - more serious error message
+      longTimeoutId = setTimeout(() => {
+        toast({
+          variant: "destructive",
+          title: "Authentication problem",
+          description: "There was a problem completing your authentication. Please try logging in again.",
+        });
+      }, 15000); // 15 second timeout
     } else {
       setAuthTimeout(false);
     }
     
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (longTimeoutId) clearTimeout(longTimeoutId);
     };
   }, [isLoading, hasAuthHash, processingAuth]);
 
   // Add a "retry" function for manual retry
   const retryAuth = async () => {
     if (hasAuthHash) {
+      setAuthTimeout(false); // Reset timeout state
       setProcessingAuth(true);
       setProcessingAttempts(prev => prev + 1);
+      
       try {
+        toast({
+          title: "Retrying authentication",
+          description: "Please wait while we try again...",
+        });
+        
         const session = await processAuthHash();
         if (!session) {
           toast({
@@ -102,6 +136,10 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
         } else {
           // Session was set successfully, the auth state listener should handle the update
           console.log("Authentication retry successful");
+          toast({
+            title: "Authentication successful",
+            description: "You are now logged in.",
+          });
         }
       } catch (error) {
         console.error("Retry auth error:", error);
@@ -121,6 +159,13 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     if (window.history && window.history.replaceState) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    
+    // Show a toast to inform the user
+    toast({
+      title: "Going back to login",
+      description: "Please try signing in again.",
+    });
+    
     navigate('/login');
   };
 
@@ -139,24 +184,26 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           </p>
         )}
         {(authTimeout) && (
-          <div className="mt-4 flex flex-col items-center">
-            <p className="text-sm text-gray-500">
+          <div className="mt-6 flex flex-col items-center">
+            <p className="text-sm text-gray-500 mb-2">
               This is taking longer than expected.
             </p>
-            <button 
-              onClick={retryAuth} 
-              className="mt-2 px-4 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary/90 transition-colors"
-              disabled={processingAuth}
-            >
-              {processingAuth ? "Retrying..." : "Retry Authentication"}
-            </button>
-            <button 
-              onClick={goToLogin} 
-              className="mt-2 px-4 py-2 bg-destructive text-white rounded-md text-sm hover:bg-destructive/90 transition-colors"
-              disabled={processingAuth}
-            >
-              Back to Login
-            </button>
+            <div className="flex space-x-3">
+              <button 
+                onClick={retryAuth} 
+                className="px-4 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary/90 transition-colors"
+                disabled={processingAuth}
+              >
+                {processingAuth ? "Retrying..." : "Retry Authentication"}
+              </button>
+              <button 
+                onClick={goToLogin} 
+                className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
+                disabled={processingAuth}
+              >
+                Back to Login
+              </button>
+            </div>
           </div>
         )}
       </div>

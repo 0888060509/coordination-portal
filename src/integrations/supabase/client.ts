@@ -15,7 +15,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true, // This is critical for OAuth hash fragment handling
+    detectSessionInUrl: false, // Changed this to false to disable automatic handling
     flowType: 'implicit', // This is important for OAuth with hash fragment handling
     debug: true, // Enable debug mode to see more information about auth state
   },
@@ -187,8 +187,21 @@ export const parseAuthHashFromUrl = async () => {
   return null;
 };
 
+// Fixed processAuthHash function with protection against multiple executions
+let isProcessingHash = false;
+let lastProcessTime = 0;
+const PROCESS_COOLDOWN = 2000; // 2 second cooldown
+
 // Improved function to process auth hash with additional logging and fallbacks
 export const processAuthHash = async () => {
+  const currentTime = Date.now();
+  
+  // Only process if not already processing and cooldown period has elapsed
+  if (isProcessingHash || currentTime - lastProcessTime < PROCESS_COOLDOWN) {
+    console.log('Skipping processAuthHash - already processing or cooldown not elapsed');
+    return null;
+  }
+  
   console.log('processAuthHash called, location hash:', window.location.hash?.substring(0, 30) + '...');
   
   if (!window.location.hash || !window.location.hash.includes('access_token')) {
@@ -197,8 +210,20 @@ export const processAuthHash = async () => {
   }
   
   try {
-    // First try the built-in Supabase method
-    console.log('Trying built-in Supabase getSession method first');
+    isProcessingHash = true;
+    lastProcessTime = currentTime;
+    
+    // First try manual parsing since the built-in methods don't seem to be working
+    console.log('Trying manual hash parsing first');
+    const session = await parseAuthHashFromUrl();
+    if (session) {
+      console.log('Manual session parsing successful');
+      isProcessingHash = false;
+      return session;
+    }
+    
+    // If that fails, try the built-in Supabase method
+    console.log('Manual parsing failed, trying built-in getSession method');
     const { data, error } = await supabase.auth.getSession();
     
     if (!error && data.session) {
@@ -207,19 +232,12 @@ export const processAuthHash = async () => {
       if (window.history && window.history.replaceState) {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
+      isProcessingHash = false;
       return data.session;
     }
     
-    console.log('Built-in getSession failed or no session found, trying manual parsing');
-    
-    // If that fails, try manual parsing
-    const session = await parseAuthHashFromUrl();
-    if (session) {
-      console.log('Manual session parsing successful');
-      return session;
-    }
-    
     console.error('All auth hash processing methods failed');
+    isProcessingHash = false;
     return null;
   } catch (error) {
     console.error('Error processing auth hash:', error);
@@ -228,6 +246,7 @@ export const processAuthHash = async () => {
       title: "Authentication error",
       description: "An error occurred while processing your login. Please try again.",
     });
+    isProcessingHash = false;
     return null;
   }
 };
