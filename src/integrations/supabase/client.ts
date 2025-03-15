@@ -17,9 +17,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     flowType: 'implicit', // This is important for OAuth with hash fragment handling
   },
   global: {
-    fetch: (...args) => {
+    fetch: (url: RequestInfo | URL, options?: RequestInit) => {
       // Add custom fetch options here if needed
-      return fetch(...args);
+      return fetch(url, options);
     },
   },
 });
