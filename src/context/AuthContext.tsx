@@ -176,10 +176,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Handle hash fragment from OAuth redirects
+  // Handle hash fragment from OAuth redirects - simplified
   useEffect(() => {
     const handleAuthCallback = async () => {
-      // Check if we have a hash in the URL (from OAuth redirect)
       if (location.hash && location.hash.includes('access_token')) {
         setIsLoading(true);
         
@@ -193,7 +192,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.log("Successfully processed auth hash with custom handler");
             setSession(session);
             await fetchProfile(session.user.id, session);
-            navigate('/dashboard');
+            
+            // Ensure navigation happens after profile is loaded
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 500);
             return;
           }
           
@@ -249,7 +252,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   description: "Welcome to MeetingMaster!",
                 });
                 
-                navigate('/dashboard');
+                // Ensure navigation after profile is loaded
+                setTimeout(() => {
+                  navigate('/dashboard', { replace: true });
+                }, 500);
               }
             } catch (manualError) {
               console.error("Manual session setup failed:", manualError);
@@ -313,14 +319,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsLoading(false);
         }
         
-        // Handle specific auth events
+        // Handle specific auth events with improved navigation
         if (event === 'SIGNED_IN') {
           toast({
             title: "Successfully signed in",
             description: "Welcome to MeetingMaster!",
           });
-          // Wait for a short time to make sure the state is updated
-          setTimeout(() => navigate('/dashboard'), 500);
+          
+          // Force navigation with delay to ensure state is updated
+          setTimeout(() => {
+            const currentPath = window.location.pathname;
+            if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+              console.log("Signed in, navigating to dashboard");
+              navigate('/dashboard', { replace: true });
+            }
+          }, 500);
         }
         
         if (event === 'SIGNED_OUT') {
@@ -339,7 +352,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [navigate]);
 
-  // Auth methods
+  // Improved login function with clearer error handling
   const login = async (email: string, password: string) => {
     let loginError: AuthError | undefined;
     

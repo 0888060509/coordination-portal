@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -41,13 +42,10 @@ const LoginPage = () => {
 
   // Reset submission state when unmounting
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
-    }
     return () => {
       setIsSubmitting(false);
     };
-  }, [isAuthenticated, navigate]);
+  }, []);
 
   // Add a short delay for initial auth check to prevent flashing
   useEffect(() => {
@@ -58,17 +56,27 @@ const LoginPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Add timeout to detect stalled login attempts with automatic retry
+  // Simplified: Direct navigation after authentication
+  useEffect(() => {
+    if (isAuthenticated && !processingOAuth) {
+      console.log("User authenticated, navigating to dashboard");
+      // Use a small timeout to ensure state updates are complete
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 500);
+    }
+  }, [isAuthenticated, processingOAuth, navigate]);
+
+  // Add timeout to detect stalled login attempts
   useEffect(() => {
     let loginTimeout: NodeJS.Timeout;
-    let navigationTimeout: NodeJS.Timeout;
 
     if (isSubmitting && !authLoading) {
       console.log("Login attempt in progress, setting timeout");
 
       loginTimeout = setTimeout(() => {
         console.log("Login attempt timed out after 10s");
-        // Instead of giving up, try to check the session status
+        // Check session status
         const checkSessionStatus = async () => {
           try {
             console.log("Checking session status after timeout");
@@ -79,8 +87,8 @@ const LoginPage = () => {
                 title: "Login successful",
                 description: "You are now logged in.",
               });
+              setIsSubmitting(false);
               navigate('/dashboard', { replace: true });
-              setIsSubmitting(false); //Added to clear loading state
               return;
             }
 
@@ -103,59 +111,44 @@ const LoginPage = () => {
       }, 10000);
     }
 
-    // If authenticated but not navigating, force navigate after a delay
-    if (isAuthenticated && !initialAuthCheck && !forcingNavigation) {
-      setForcingNavigation(true);
-      console.log("User is authenticated, forcing navigation to dashboard");
-
-      navigationTimeout = setTimeout(() => {
-        console.log("Executing forced navigation to dashboard");
-        navigate(from, { replace: true });
-      }, 1500);
-    }
-
     return () => {
       if (loginTimeout) clearTimeout(loginTimeout);
-      if (navigationTimeout) clearTimeout(navigationTimeout);
     };
-  }, [isSubmitting, authLoading, isAuthenticated, initialAuthCheck, navigate, from, forcingNavigation]);
+  }, [isSubmitting, authLoading, navigate]);
 
-  // Check for authentication hash on mount with enhanced error handling
+  // Simplified OAuth hash processing
   useEffect(() => {
     if (location.hash && location.hash.includes('access_token')) {
       const processAuth = async () => {
         try {
           setProcessingOAuth(true);
           setAuthError(null);
-
-          console.log("Login page: Processing OAuth hash");
-          // First clear the hash to prevent repeated processing
-          const currentHash = location.hash;
+          console.log("Processing OAuth hash");
+          
+          // Clear hash to prevent repeated processing
           if (window.history && window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           }
 
           const session = await processAuthHash();
-
+          
           if (session) {
-            console.log("Login page: OAuth processing successful");
+            console.log("OAuth processing successful");
             toast({
               title: "Successfully signed in",
               description: "Welcome to MeetingMaster!",
             });
-
-            // Small delay before navigation to ensure state is updated
-            setTimeout(() => {
-              console.log("Navigating to dashboard after OAuth processing");
-              navigate('/dashboard', { replace: true });
-            }, 1000);
+            
+            // Force navigation after successful OAuth
+            setProcessingOAuth(false);
+            navigate('/dashboard', { replace: true });
           } else {
             console.error("Failed to process OAuth hash");
             setProcessingOAuth(false);
             setAuthError("Failed to complete authentication. Please try again.");
           }
         } catch (error) {
-          console.error("Error processing OAuth in LoginPage:", error);
+          console.error("Error processing OAuth:", error);
           setAuthError("Failed to complete authentication. Please try again.");
           setProcessingOAuth(false);
         }
@@ -165,26 +158,6 @@ const LoginPage = () => {
     }
   }, [location.hash, navigate]);
 
-  // If user is already authenticated, redirect to dashboard
-  // Add a delay to prevent immediate redirect which can cause flickering
-  useEffect(() => {
-    let redirectTimer: NodeJS.Timeout;
-
-    if (isAuthenticated && !authLoading && !processingOAuth && !initialAuthCheck && !forcingNavigation) {
-      console.log("User is authenticated, scheduling navigation");
-      setForcingNavigation(true);
-
-      redirectTimer = setTimeout(() => {
-        console.log("Executing navigation to", from);
-        navigate(from, { replace: true });
-      }, 1000);
-    }
-
-    return () => {
-      if (redirectTimer) clearTimeout(redirectTimer);
-    };
-  }, [isAuthenticated, authLoading, processingOAuth, navigate, from, initialAuthCheck, forcingNavigation]);
-
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -193,33 +166,62 @@ const LoginPage = () => {
     },
   });
 
+  // Improved onSubmit with better error handling and explicit navigation
   const onSubmit = async (data: FormValues) => {
     if (isSubmitting) return;
     
     setIsSubmitting(true);
     setAuthError(null);
+    setLoginAttempts(prev => prev + 1);
     
     try {
+      console.log("Attempting login with email:", data.email);
       const result = await login(data.email, data.password);
-      if (result.error) throw result.error;
       
+      if (result.error) {
+        throw result.error;
+      }
+      
+      // Successful login
+      console.log("Login successful, session created");
       toast({
         title: "Success",
         description: "Logged in successfully",
       });
+      
+      // Important: Set loading state to false BEFORE navigation
       setIsSubmitting(false);
-      navigate('/dashboard', { replace: true });
+      
+      // Force navigate to dashboard with a small delay to ensure state updates
+      setTimeout(() => {
+        console.log("Forcing navigation to dashboard after login");
+        navigate('/dashboard', { replace: true });
+      }, 500);
     } catch (error) {
       console.error("Login failed:", error);
-      setAuthError(typeof error === 'string' ? error : 
-        error instanceof Error ? error.message : 
-        "Invalid email or password. Please try again.");
+      
+      // Clear loading state
       setIsSubmitting(false);
+      
+      // Set appropriate error message
+      setAuthError(
+        typeof error === 'string' ? error : 
+        error instanceof Error ? error.message : 
+        "Invalid email or password. Please try again."
+      );
+      
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: typeof error === 'string' ? error : 
+          error instanceof Error ? error.message : 
+          "Invalid email or password. Please try again.",
+      });
     }
   };
 
   const handleGoogleLogin = async () => {
-    if (isSubmitting || processingOAuth) return; // Prevent actions when already processing
+    if (isSubmitting || processingOAuth) return;
 
     setAuthError(null);
     try {
@@ -231,14 +233,14 @@ const LoginPage = () => {
     }
   };
 
-  // Force reset the submission state if it's been submitting for too long
+  // Only show loading during initial page load or when explicitly processing OAuth
+  const showLoadingState = (authLoading && initialAuthCheck) || processingOAuth;
+
+  // Reset the submission state if it's been submitting for too long
   const handleResetSubmission = () => {
     setIsSubmitting(false);
     setAuthError("Login attempt was reset. Please try again.");
   };
-
-  // Only show loading during initial page load or when explicitly processing OAuth
-  const showLoadingState = (authLoading && initialAuthCheck) || processingOAuth;
 
   if (showLoadingState) {
     return (

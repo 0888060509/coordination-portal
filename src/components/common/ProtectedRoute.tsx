@@ -54,7 +54,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     }
   }, [isAuthenticated, user, isLoading, navigate, verifyingSession]);
 
-  // Enhanced auth hash processing with better state tracking
+  // Simplified auth hash processing
   useEffect(() => {
     let isMounted = true;
     
@@ -68,6 +68,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
         try {
           console.log("ProtectedRoute: Processing auth hash manually, attempt:", processingAttempts + 1);
           
+          // Clear hash from URL to prevent loops
           if (window.history && window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           }
@@ -94,7 +95,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
                 console.log("Forcing navigation to dashboard after successful hash processing");
                 navigate('/dashboard', { replace: true });
               }
-            }, 1000);
+            }, 500);
           }
         } catch (error) {
           if (!isMounted) return;
@@ -120,6 +121,17 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
       isMounted = false;
     };
   }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts, navigate, hasTriedProcessing, authProcessComplete]);
+
+  // Clearer navigation for authenticated users
+  useEffect(() => {
+    if (isAuthenticated && !processingAuth && !isLoading) {
+      const currentPath = window.location.pathname;
+      if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+        console.log("Authenticated user on auth page, redirecting to dashboard");
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [isAuthenticated, processingAuth, isLoading, navigate]);
 
   // More aggressive timeout handling with auto-retry
   useEffect(() => {
