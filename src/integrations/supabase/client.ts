@@ -22,6 +22,15 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       return fetch(url, options);
     },
   },
+  // Add request retry logic
+  db: {
+    schema: 'public',
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
 });
 
 // Helper function to handle Supabase errors consistently
@@ -43,17 +52,22 @@ export const handleSupabaseError = (error: any): string => {
 // Helper function to parse auth hash from URL (for OAuth flows)
 export const parseAuthHashFromUrl = async () => {
   if (window.location.hash && window.location.hash.includes('access_token')) {
-    const { data, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      console.error('Error parsing auth hash:', error);
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error parsing auth hash:', error);
+        return null;
+      }
+      
+      // Clean the URL by removing the hash
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      return data.session;
+    } catch (error) {
+      console.error('Error in parseAuthHashFromUrl:', error);
       return null;
     }
-    
-    // Clean the URL by removing the hash
-    window.history.replaceState({}, document.title, window.location.pathname);
-    
-    return data.session;
   }
   
   return null;

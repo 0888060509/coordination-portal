@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, handleSupabaseError } from "@/integrations/supabase/client";
 import { User as SupabaseUser, Session, AuthError } from "@supabase/supabase-js";
 
 // Types
@@ -119,13 +119,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Fetch user profile from profiles table
   const fetchProfile = async (userId: string, currentSession: Session | null) => {
     try {
+      console.log("Fetching profile for user:", userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching profile:", error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.log("No profile found, creating one...");
+        // Profile doesn't exist, create one
+        const sessionUser = currentSession?.user;
+        const firstName = sessionUser?.user_metadata?.full_name?.split(' ')?.[0] || '';
+        const lastName = sessionUser?.user_metadata?.full_name?.split(' ')?.slice(1)?.join(' ') || '';
+        
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            first_name: firstName,
+            last_name: lastName,
+            email: sessionUser?.email || '',
+            avatar_url: sessionUser?.user_metadata?.avatar_url || '',
+          });
+          
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+          throw insertError;
+        }
+        
+        // Fetch the newly created profile
+        const { data: newProfile, error: fetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+          
+        if (fetchError || !newProfile) {
+          console.error("Error fetching new profile:", fetchError);
+          throw fetchError;
+        }
+        
+        data = newProfile;
+      }
       
       // Get user details from session
       const sessionUser = currentSession?.user;
@@ -137,7 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || sessionUser?.email || '',
         firstName: data.first_name || '',
         lastName: data.last_name || '',
-        avatarUrl: data.avatar_url || sessionUser?.user_metadata.avatar_url,
+        avatarUrl: data.avatar_url || sessionUser?.user_metadata?.avatar_url,
         role: data.is_admin ? 'admin' : 'user',
         department: data.department || undefined,
         position: data.position || undefined,
@@ -146,7 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(transformedUser);
       setIsAdmin(data.is_admin || false);
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error in profile flow:', error);
       setUser(null);
       setIsAdmin(false);
     } finally {
