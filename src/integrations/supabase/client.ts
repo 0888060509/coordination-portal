@@ -17,7 +17,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
     detectSessionInUrl: false, // Explicitly disable automatic handling to avoid hash parsing issues
     flowType: 'implicit', // This is important for OAuth with hash fragment handling
-    debug: true, // Enable debug mode to see more information about auth state
+    debug: false, // Disable debug mode in production
   },
   global: {
     fetch: (url: RequestInfo | URL, options?: RequestInit) => {
@@ -212,6 +212,11 @@ export const processAuthHash = async () => {
     isProcessingHash = true;
     lastProcessTime = currentTime;
     
+    // Clear hash from URL first to prevent processing loops
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
     // First try manual parsing since the built-in methods don't seem to be working
     console.log('Trying manual hash parsing first');
     const session = await parseAuthHashFromUrl();
@@ -227,10 +232,6 @@ export const processAuthHash = async () => {
     
     if (!error && data.session) {
       console.log('Built-in getSession successful, user authenticated');
-      // Clean the URL
-      if (window.history && window.history.replaceState) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
       isProcessingHash = false;
       return data.session;
     }

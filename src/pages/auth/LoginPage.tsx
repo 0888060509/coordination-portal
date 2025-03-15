@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -69,9 +70,20 @@ const LoginPage = () => {
   }, [location.hash, navigate]);
 
   // If user is already authenticated, redirect to dashboard
-  if (isAuthenticated && !isLoading && !processingOAuth) {
-    return <Navigate to={from} replace />;
-  }
+  // Add a delay to prevent immediate redirect which can cause flickering
+  useEffect(() => {
+    let redirectTimer: NodeJS.Timeout;
+    
+    if (isAuthenticated && !isLoading && !processingOAuth) {
+      redirectTimer = setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 100);
+    }
+    
+    return () => {
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
+  }, [isAuthenticated, isLoading, processingOAuth, navigate, from]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -94,7 +106,8 @@ const LoginPage = () => {
     } catch (error) {
       console.error("Login failed:", error);
       setAuthError("Invalid email or password. Please try again.");
-      setIsSubmitting(false); // Only set submitting to false on error
+    } finally {
+      setIsSubmitting(false); // Always set submitting to false to unlock the form
     }
   };
 
@@ -109,8 +122,8 @@ const LoginPage = () => {
     }
   };
 
-  // Loading state
-  if (isLoading || processingOAuth) {
+  // Loading state - but avoid getting stuck here
+  if ((isLoading || processingOAuth) && !authError) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -119,9 +132,21 @@ const LoginPage = () => {
             {processingOAuth ? "Completing authentication..." : "Loading..."}
           </h2>
           <p className="mt-2 text-gray-500">Please wait while we sign you in.</p>
+          <Button 
+            variant="link" 
+            className="mt-4 text-sm text-gray-500" 
+            onClick={() => window.location.href = '/login'}
+          >
+            Taking too long? Click here to restart
+          </Button>
         </div>
       </div>
     );
+  }
+
+  // Don't redirect here, do it in the useEffect instead to prevent recursive loops
+  if (isAuthenticated && !isLoading && !processingOAuth) {
+    return null; // useEffect will handle the navigation
   }
 
   return (
