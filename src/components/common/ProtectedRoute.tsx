@@ -128,7 +128,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     let longTimeoutId: NodeJS.Timeout;
     let retryTimeoutId: NodeJS.Timeout;
     
-    if (isLoading || (hasAuthHash && processingAuth)) {
+    if ((isLoading || (hasAuthHash && processingAuth)) && !isAuthenticated) {
       // First timeout - show message
       timeoutId = setTimeout(() => {
         console.log("Authentication loading timeout reached");
@@ -173,7 +173,14 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
       if (retryTimeoutId) clearTimeout(retryTimeoutId);
       if (longTimeoutId) clearTimeout(longTimeoutId);
     };
-  }, [isLoading, hasAuthHash, processingAuth, navigate, processingAttempts]);
+  }, [isLoading, hasAuthHash, processingAuth, navigate, processingAttempts, isAuthenticated]);
+
+  // Add immediate navigation when authenticated
+  useEffect(() => {
+    if (isAuthenticated && !processingAuth) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, processingAuth, navigate]);
 
   // Improved retry authentication with more explicit logging
   const retryAuth = async () => {
