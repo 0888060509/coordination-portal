@@ -27,6 +27,7 @@ const ForgotPasswordPage = () => {
   const { forgotPassword } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -37,11 +38,13 @@ const ForgotPasswordPage = () => {
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
+    setError(null);
     try {
       await forgotPassword(data.email);
       setIsEmailSent(true);
     } catch (error) {
       console.error("Password reset request failed:", error);
+      setError("Failed to send reset instructions. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -86,6 +89,12 @@ const ForgotPasswordPage = () => {
                   Enter your email and we'll send you instructions to reset your password.
                 </p>
               </div>
+
+              {error && (
+                <div className="mb-6 p-3 bg-red-100 text-red-700 rounded-md">
+                  {error}
+                </div>
+              )}
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -141,6 +150,3 @@ const ForgotPasswordPage = () => {
       </div>
     </div>
   );
-};
-
-export default ForgotPasswordPage;

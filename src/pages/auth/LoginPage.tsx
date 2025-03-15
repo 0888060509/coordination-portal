@@ -29,6 +29,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Get the page they were trying to access
   const from = location.state?.from?.pathname || "/dashboard";
@@ -48,22 +49,26 @@ const LoginPage = () => {
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
+    setAuthError(null);
     try {
       await login(data.email, data.password);
       // The navigation will be handled by the auth state change listener
     } catch (error) {
       console.error("Login failed:", error);
+      setAuthError("Invalid email or password. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleGoogleLogin = async () => {
+    setAuthError(null);
     try {
       await loginWithGoogle();
       // Auth state change will handle navigation
     } catch (error) {
       console.error("Google login failed:", error);
+      setAuthError("Google login failed. Please try again.");
     }
   };
 
@@ -130,6 +135,12 @@ const LoginPage = () => {
                 Enter your credentials to access your account
               </p>
             </div>
+
+            {authError && (
+              <div className="mb-6 p-3 bg-red-100 text-red-700 rounded-md">
+                {authError}
+              </div>
+            )}
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
