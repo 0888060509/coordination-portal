@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -33,6 +33,7 @@ const LoginPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [processingOAuth, setProcessingOAuth] = useState(false);
+  const [initialAuthCheck, setInitialAuthCheck] = useState(true);
 
   // Get the page they were trying to access
   const from = location.state?.from?.pathname || "/dashboard";
@@ -56,17 +57,25 @@ const LoginPage = () => {
               description: "Welcome to MeetingMaster!",
             });
             navigate('/dashboard');
+          } else {
+            setProcessingOAuth(false);
           }
         } catch (error) {
           console.error("Error processing OAuth in LoginPage:", error);
           setAuthError("Failed to complete authentication. Please try again.");
-        } finally {
           setProcessingOAuth(false);
         }
       };
       
       processAuth();
     }
+    
+    // Clear initial auth check after a short delay
+    const timer = setTimeout(() => {
+      setInitialAuthCheck(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
   }, [location.hash, navigate]);
 
   // If user is already authenticated, redirect to dashboard
@@ -74,7 +83,7 @@ const LoginPage = () => {
   useEffect(() => {
     let redirectTimer: NodeJS.Timeout;
     
-    if (isAuthenticated && !isLoading && !processingOAuth) {
+    if (isAuthenticated && !isLoading && !processingOAuth && !initialAuthCheck) {
       redirectTimer = setTimeout(() => {
         navigate(from, { replace: true });
       }, 100);
@@ -83,7 +92,7 @@ const LoginPage = () => {
     return () => {
       if (redirectTimer) clearTimeout(redirectTimer);
     };
-  }, [isAuthenticated, isLoading, processingOAuth, navigate, from]);
+  }, [isAuthenticated, isLoading, processingOAuth, navigate, from, initialAuthCheck]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -94,6 +103,8 @@ const LoginPage = () => {
   });
 
   const onSubmit = async (data: FormValues) => {
+    if (isSubmitting) return; // Prevent multiple submissions
+    
     setIsSubmitting(true);
     setAuthError(null);
     try {
@@ -112,6 +123,8 @@ const LoginPage = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (isSubmitting || processingOAuth) return; // Prevent actions when already processing
+    
     setAuthError(null);
     try {
       await loginWithGoogle();
@@ -122,8 +135,10 @@ const LoginPage = () => {
     }
   };
 
-  // Loading state - but avoid getting stuck here
-  if ((isLoading || processingOAuth) && !authError) {
+  // Only show loading during initial page load or when explicitly processing OAuth
+  const showLoadingState = (isLoading && initialAuthCheck) || processingOAuth;
+
+  if (showLoadingState) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -144,11 +159,7 @@ const LoginPage = () => {
     );
   }
 
-  // Don't redirect here, do it in the useEffect instead to prevent recursive loops
-  if (isAuthenticated && !isLoading && !processingOAuth) {
-    return null; // useEffect will handle the navigation
-  }
-
+  // Regular login form view
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:flex lg:w-1/2 bg-meeting-primary bg-opacity-90 p-12 text-white">
@@ -303,7 +314,7 @@ const LoginPage = () => {
                   variant="outline"
                   className="w-full"
                   onClick={handleGoogleLogin}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || processingOAuth}
                 >
                   <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
                     <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">

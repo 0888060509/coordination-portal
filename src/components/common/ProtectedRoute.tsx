@@ -18,6 +18,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const [authTimeout, setAuthTimeout] = useState(false);
   const [processingAuth, setProcessingAuth] = useState(false);
   const [processingAttempts, setProcessingAttempts] = useState(0);
+  const [hasTriedProcessing, setHasTriedProcessing] = useState(false);
 
   // Check for authentication hash in URL
   const hasAuthHash = location.hash && location.hash.includes('access_token');
@@ -27,10 +28,12 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     let isMounted = true;
     
     const handleAuthHash = async () => {
-      if (hasAuthHash && !isAuthenticated && !processingAuth && processingAttempts < 3) {
+      if (hasAuthHash && !isAuthenticated && !processingAuth && processingAttempts < 3 && !hasTriedProcessing) {
         if (!isMounted) return;
         
         setProcessingAuth(true);
+        setHasTriedProcessing(true);
+        
         try {
           console.log("ProtectedRoute: Processing auth hash manually, attempt:", processingAttempts + 1);
           const session = await processAuthHash();
@@ -72,14 +75,14 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     return () => {
       isMounted = false;
     };
-  }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts, navigate]);
+  }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts, navigate, hasTriedProcessing]);
 
   // Add timeout for authentication loading with progressive feedback
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     let longTimeoutId: NodeJS.Timeout;
     
-    if (isLoading || hasAuthHash || processingAuth) {
+    if (isLoading || (hasAuthHash && processingAuth)) {
       // Initial timeout - show retry options
       timeoutId = setTimeout(() => {
         console.log("Authentication loading timeout reached");
@@ -169,7 +172,10 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     navigate('/login');
   };
 
-  if (isLoading || hasAuthHash || processingAuth) {
+  // Only show loading during active processing
+  const showLoading = isLoading || (hasAuthHash && processingAuth);
+
+  if (showLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <LoadingSpinner 
