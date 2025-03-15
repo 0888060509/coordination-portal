@@ -1,3 +1,4 @@
+
 // This file contains the Supabase client configuration.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
@@ -214,7 +215,7 @@ export const processAuthHash = async () => {
       
       // If we have a hash but it doesn't contain access_token, try to get it from the full URL
       if (!window.location.hash.includes('access_token')) {
-        console.log('Hash doesn't contain access_token, checking full URL');
+        console.log("Hash doesn't contain access_token, checking full URL");
         const fullUrl = window.location.href;
         
         if (fullUrl.includes('access_token')) {
