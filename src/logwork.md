@@ -39,3 +39,7 @@
 - Added created_at field to amenity objects in useRooms hook
 - Fixed RoomsPage to properly pass isLoading prop to RoomList component
 - Updated RoomsPage to use RoomProvider for proper context integration
+
+## 2023-08-17
+- Fixed TypeScript errors in useRooms hook by adding missing properties to mock room data
+- Added floor, room_number, is_active, created_at and updated_at fields to match RoomWithAmenities type
