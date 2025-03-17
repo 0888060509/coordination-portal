@@ -43,3 +43,9 @@
 ## 2023-08-17
 - Fixed TypeScript errors in useRooms hook by adding missing properties to mock room data
 - Added floor, room_number, is_active, created_at and updated_at fields to match RoomWithAmenities type
+
+## 2023-08-18
+- Added AttendeesResources and RecurringOptions components for the booking form
+- Created dateUtils.ts utility for date formatting functions
+- Extended types with EQUIPMENT_OPTIONS and DAYS_OF_WEEK constants
+- Adapted Chakra UI components to use shadcn/ui components
