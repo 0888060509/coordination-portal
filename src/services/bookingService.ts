@@ -103,21 +103,72 @@ export const bookingService = {
   // Create a new booking
   async createBooking(bookingData: CreateBookingData): Promise<string> {
     try {
-      // Use the create_booking RPC function which handles conflict checking
+      // Prepare booking data with all fields
+      const booking = {
+        room_id: bookingData.room_id,
+        user_id: bookingData.user_id,
+        title: bookingData.title,
+        description: bookingData.description || '',
+        start_time: bookingData.start_time.toISOString(),
+        end_time: bookingData.end_time.toISOString(),
+        meeting_type: bookingData.meeting_type || null,
+        special_requests: bookingData.special_requests || null,
+        status: 'confirmed'
+      };
+
+      // Use create_booking RPC function which handles conflict checking
       const { data, error } = await supabase.rpc('create_booking', {
-        p_room_id: bookingData.room_id,
-        p_user_id: bookingData.user_id,
-        p_title: bookingData.title,
-        p_description: bookingData.description || '',
-        p_start_time: bookingData.start_time.toISOString(),
-        p_end_time: bookingData.end_time.toISOString()
+        p_room_id: booking.room_id,
+        p_user_id: booking.user_id,
+        p_title: booking.title,
+        p_description: booking.description,
+        p_start_time: booking.start_time,
+        p_end_time: booking.end_time
       });
 
       if (error) {
         throw error;
       }
 
-      return data as string;
+      // The RPC function returns the booking ID
+      const bookingId = data as string;
+      
+      // Update the booking with additional fields
+      // (RPC doesn't handle all fields, so we update separately)
+      if (booking.meeting_type || booking.special_requests) {
+        const { error: updateError } = await supabase
+          .from('bookings')
+          .update({
+            meeting_type: booking.meeting_type,
+            special_requests: booking.special_requests
+          })
+          .eq('id', bookingId);
+
+        if (updateError) {
+          console.error('Error updating booking with additional details:', updateError);
+          // Don't throw here - the booking was created, just the extra fields weren't updated
+        }
+      }
+
+      // If attendees are provided, add them
+      if (bookingData.attendees && bookingData.attendees.length > 0) {
+        const attendeesData = bookingData.attendees.map(attendeeId => ({
+          booking_id: bookingId,
+          user_id: attendeeId,
+          status: 'pending'
+        }));
+
+        const { error: attendeesError } = await supabase
+          .from('booking_attendees')
+          .insert(attendeesData);
+
+        if (attendeesError) {
+          console.error('Error adding booking attendees:', attendeesError);
+          // Don't throw here - the booking was created, just the attendees weren't added
+        }
+      }
+
+      return bookingId;
     } catch (error) {
       console.error('Error creating booking:', error);
       throw error;
@@ -163,11 +214,14 @@ export const bookingService = {
   },
 
   // Cancel a booking
-  async cancelBooking(id: string): Promise<void> {
+  async cancelBooking(id: string, reason?: string): Promise<void> {
     try {
       const { error } = await supabase
         .from('bookings')
-        .update({ status: 'cancelled' })
+        .update({ 
+          status: 'cancelled',
+          cancellation_reason: reason || 'Cancelled by user'
+        })
         .eq('id', id);
 
       if (error) {

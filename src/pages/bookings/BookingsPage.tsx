@@ -75,9 +75,16 @@ const BookingsPage = () => {
                     Rooms
                   </NavItem>
                   <NavItem
+                    icon="bookRoom"
+                    to="/rooms?booking=new"
+                    isActive={location.search === '?booking=new'}
+                  >
+                    Book a Room
+                  </NavItem>
+                  <NavItem
                     icon="bookings"
                     to="/bookings"
-                    isActive={location.pathname === '/bookings'}
+                    isActive={location.pathname === '/bookings' && !location.search}
                   >
                     My Bookings
                   </NavItem>

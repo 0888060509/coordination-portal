@@ -7,7 +7,8 @@ import {
   Users, 
   DoorClosed, 
   LayoutDashboard,
-  Shield
+  Shield,
+  CalendarClock
 } from "lucide-react";
 import { 
   SidebarMenuItem, 
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 
 interface NavItemProps {
-  icon: "dashboard" | "rooms" | "bookings" | "admin" | "roomManagement" | "userManagement" | "security";
+  icon: "dashboard" | "rooms" | "bookings" | "admin" | "roomManagement" | "userManagement" | "security" | "bookRoom";
   to: string;
   isActive?: boolean;
   children: ReactNode;
@@ -32,6 +33,8 @@ const NavItem = ({ icon, to, children, isActive, onClick }: NavItemProps) => {
         return <DoorClosed className="h-5 w-5" />;
       case "bookings":
         return <Calendar className="h-5 w-5" />;
+      case "bookRoom":
+        return <CalendarClock className="h-5 w-5" />;
       case "admin":
         return <LayoutDashboard className="h-5 w-5" />;
       case "roomManagement":

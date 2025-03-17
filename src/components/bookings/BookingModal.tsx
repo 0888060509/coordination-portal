@@ -7,7 +7,11 @@ import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import { format, setHours, setMinutes } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -23,10 +27,21 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { CalendarIcon, Clock, Users, Video, Coffee } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bookingService } from "@/services/bookingService";
@@ -47,6 +62,18 @@ const parseTimeString = (timeString: string, baseDate: Date): Date => {
   return setMinutes(setHours(new Date(baseDate), hours), minutes);
 };
 
+// Meeting types
+const meetingTypes = [
+  "Team Meeting",
+  "Client Meeting", 
+  "Interview",
+  "Training",
+  "Presentation",
+  "Workshop",
+  "Brainstorming",
+  "Other"
+];
+
 // Create validation schema
 const bookingSchema = z.object({
   title: z.string().min(3, { message: 'Title must be at least 3 characters' }),
@@ -60,6 +87,10 @@ const bookingSchema = z.object({
   endTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, { 
     message: 'Invalid time format'
   }),
+  meetingType: z.string().optional(),
+  specialRequests: z.string().optional(),
+  requiresVideoConferencing: z.boolean().default(false),
+  requiresRefreshments: z.boolean().default(false),
 }).refine((data) => {
   const startDateTime = parseTimeString(data.startTime, data.date);
   const endDateTime = parseTimeString(data.endTime, data.date);
@@ -98,7 +129,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
       description: '',
       date: initialDate,
       startTime: initialStartTime,
-      endTime: initialEndTime
+      endTime: initialEndTime,
+      meetingType: '',
+      specialRequests: '',
+      requiresVideoConferencing: false,
+      requiresRefreshments: false
     }
   });
 
@@ -110,7 +145,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
         description: '',
         date: initialDate,
         startTime: initialStartTime,
-        endTime: initialEndTime
+        endTime: initialEndTime,
+        meetingType: '',
+        specialRequests: '',
+        requiresVideoConferencing: false,
+        requiresRefreshments: false
       });
     }
   }, [isOpen, form, initialDate, initialStartTime, initialEndTime]);
@@ -132,18 +171,29 @@ const BookingModal: React.FC<BookingModalProps> = ({
       const startDateTime = parseTimeString(data.startTime, data.date);
       const endDateTime = parseTimeString(data.endTime, data.date);
 
+      // Prepare special requests
+      let specialRequests = data.specialRequests || '';
+      if (data.requiresVideoConferencing) {
+        specialRequests += '\nVideo conferencing required.';
+      }
+      if (data.requiresRefreshments) {
+        specialRequests += '\nRefreshments required.';
+      }
+
       // Create booking
       await bookingService.createBooking({
         room_id: room.id,
         user_id: user.id,
         title: data.title,
         description: data.description,
+        meeting_type: data.meetingType,
+        special_requests: specialRequests.trim(),
         start_time: startDateTime,
         end_time: endDateTime
       });
 
       toast({
-        title: "Room booked",
+        title: "Room booked successfully",
         description: `You have successfully booked ${room.name}`,
       });
 
@@ -167,7 +217,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Book {room.name}</DialogTitle>
         </DialogHeader>
@@ -177,13 +227,30 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {/* Room details summary */}
             <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-md">
               <p className="font-bold">{room.name}</p>
-              <div className="mt-1">
-                <span className="mr-2">Capacity:</span>
-                <span>{room.capacity} people</span>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex items-center">
+                  <Users className="h-4 w-4 mr-1 text-gray-500" />
+                  <span className="text-sm">{room.capacity} people</span>
+                </div>
+                <div className="flex items-center">
+                  <Clock className="h-4 w-4 mr-1 text-gray-500" />
+                  <span className="text-sm">
+                    {watchDate && watchStartTime && watchEndTime ? 
+                      `${format(watchDate, 'EEE, MMM d')} · ${watchStartTime} - ${watchEndTime}` : 
+                      'Select date and time'}
+                  </span>
+                </div>
               </div>
-              <div className="mt-1">
-                <span className="mr-2">Location:</span>
-                <span>{room.location}{room.floor ? `, Floor ${room.floor}` : ''}</span>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {room.amenities.map((amenity) => (
+                  <Badge
+                    key={amenity.id}
+                    variant="outline"
+                    className="flex items-center gap-1 text-xs"
+                  >
+                    {amenity.name}
+                  </Badge>
+                ))}
               </div>
             </div>
 
@@ -202,13 +269,40 @@ const BookingModal: React.FC<BookingModalProps> = ({
               )}
             />
 
+            {/* Meeting type */}
+            <FormField
+              control={form.control}
+              name="meetingType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Meeting Type</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select meeting type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {meetingTypes.map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Booking description */}
             <FormField
               control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormLabel>Description</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Enter meeting description"
@@ -240,6 +334,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                           ) : (
                             <span>Pick a date</span>
                           )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
@@ -250,6 +345,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         onSelect={field.onChange}
                         disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                         initialFocus
+                        className="p-3 pointer-events-auto"
                       />
                     </PopoverContent>
                   </Popover>
@@ -289,14 +385,78 @@ const BookingModal: React.FC<BookingModalProps> = ({
               />
             </div>
 
-            {/* Time summary */}
-            {watchDate && watchStartTime && watchEndTime && (
-              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-md">
-                <p className="text-sm">
-                  {format(watchDate, 'EEEE, MMMM d, yyyy')} from {watchStartTime} to {watchEndTime}
-                </p>
+            {/* Special Requirements */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Special Requirements</h3>
+              
+              <div className="flex flex-col space-y-2">
+                <FormField
+                  control={form.control}
+                  name="requiresVideoConferencing"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="flex items-center">
+                          <Video className="h-4 w-4 mr-2" />
+                          Video Conferencing
+                        </FormLabel>
+                        <FormDescription>
+                          Request video conferencing setup
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="requiresRefreshments"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="flex items-center">
+                          <Coffee className="h-4 w-4 mr-2" />
+                          Refreshments
+                        </FormLabel>
+                        <FormDescription>
+                          Request refreshments for attendees
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
               </div>
-            )}
+
+              <FormField
+                control={form.control}
+                name="specialRequests"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Additional Requests</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Any other special requirements or notes"
+                        className="resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <DialogFooter>
               <DialogClose asChild>

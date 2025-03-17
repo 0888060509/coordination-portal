@@ -29,6 +29,9 @@ export interface CreateBookingData {
   description?: string;
   start_time: Date;
   end_time: Date;
+  meeting_type?: string;
+  attendees?: string[];
+  special_requests?: string;
 }
 
 export interface RecurringPattern {
@@ -41,4 +44,13 @@ export interface RecurringPattern {
   end_date?: string;
   max_occurrences?: number;
   created_at: string;
+}
+
+export interface BookingAttendee {
+  id: string;
+  booking_id: string;
+  user_id: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
+  updated_at: string;
 }

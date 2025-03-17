@@ -67,12 +67,15 @@ export type Database = {
       }
       bookings: {
         Row: {
+          cancellation_reason: string | null
           created_at: string
           description: string | null
           end_time: string
           id: string
+          meeting_type: string | null
           recurring_pattern_id: string | null
           room_id: string
+          special_requests: string | null
           start_time: string
           status: string
           title: string
@@ -80,12 +83,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cancellation_reason?: string | null
           created_at?: string
           description?: string | null
           end_time: string
           id?: string
+          meeting_type?: string | null
           recurring_pattern_id?: string | null
           room_id: string
+          special_requests?: string | null
           start_time: string
           status?: string
           title: string
@@ -93,12 +99,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cancellation_reason?: string | null
           created_at?: string
           description?: string | null
           end_time?: string
           id?: string
+          meeting_type?: string | null
           recurring_pattern_id?: string | null
           room_id?: string
+          special_requests?: string | null
           start_time?: string
           status?: string
           title?: string
@@ -118,6 +127,44 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
         ]
@@ -280,10 +327,106 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cancel_recurring_bookings: {
+        Args: {
+          p_pattern_id: string
+          p_cancel_all?: boolean
+          p_booking_id?: string
+          p_cancellation_reason?: string
+        }
+        Returns: number
+      }
+      check_recurring_availability: {
+        Args: {
+          p_room_id: string
+          p_start_date: string
+          p_end_date: string
+          p_frequency: string
+          p_interval: number
+          p_days_of_week?: number[]
+          p_max_occurrences?: number
+          p_pattern_end_date?: string
+          p_exclude_booking_id?: string
+        }
+        Returns: {
+          occurrence_date: string
+          is_available: boolean
+          conflicting_booking_id: string
+        }[]
+      }
+      check_room_availability: {
+        Args: {
+          room_id: string
+          start_time: string
+          end_time: string
+          exclude_booking_id?: string
+        }
+        Returns: boolean
+      }
+      create_booking: {
+        Args: {
+          p_room_id: string
+          p_user_id: string
+          p_title: string
+          p_description: string
+          p_start_time: string
+          p_end_time: string
+        }
+        Returns: string
+      }
+      create_recurring_bookings: {
+        Args: {
+          p_room_id: string
+          p_user_id: string
+          p_title: string
+          p_description: string
+          p_start_time: string
+          p_end_time: string
+          p_frequency: string
+          p_interval: number
+          p_days_of_week?: number[]
+          p_max_occurrences?: number
+          p_pattern_end_date?: string
+          p_exclude_dates?: string[]
+        }
+        Returns: {
+          booking_id: string
+          occurrence_date: string
+          status: string
+        }[]
+      }
+      find_available_time_slots: {
+        Args: {
+          room_id: string
+          date_to_check: string
+          business_start_hour?: number
+          business_end_hour?: number
+          slot_duration_minutes?: number
+        }
+        Returns: {
+          start_time: string
+          end_time: string
+          is_available: boolean
+        }[]
+      }
+      generate_recurring_dates: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+          p_frequency: string
+          p_interval: number
+          p_days_of_week: number[]
+          p_max_occurrences?: number
+          p_pattern_end_date?: string
+        }
+        Returns: {
+          occurrence_date: string
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      frequency_type: "daily" | "weekly" | "monthly"
+      notification_type: "confirmation" | "reminder" | "update" | "cancellation"
     }
     CompositeTypes: {
       [_ in never]: never
