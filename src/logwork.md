@@ -1,4 +1,3 @@
-
 # Development Log
 
 ## 2025-03-17: Fixed Navigation Function Import Error
@@ -39,7 +38,7 @@ The navigation issue was caused by incorrect route definitions and page componen
 
 The issue was caused by a mismatch between the props expected by the NavItem component and the props being passed to it from the Sidebar. The NavItem component expected props like `expanded` and `children`, but was receiving `label` and `expanded`. The fix ensures that the correct props are used consistently.
 
-## 2025-03-18: Fixed Page Content Not Displaying Due to Data Fetching Issues
+## 2025-03-18: Fixed PageContent Not Displaying Due to Data Fetching Issues
 
 - Fixed issues with data fetching in bookings and notifications components
 - Updated useBookings hook to correctly use the authenticated user's ID
@@ -48,3 +47,12 @@ The issue was caused by a mismatch between the props expected by the NavItem com
 - Fixed AppLayout to ensure proper rendering of route content
 
 The issue was caused by hardcoded user IDs ("123") being used in database queries instead of the actual authenticated user's ID. This resulted in SQL errors in the backend and prevented data from being displayed. The fix ensures that the authenticated user's ID is properly used in all database requests.
+
+## 2025-03-18: Fixed PageHeader Component Props Type Error
+
+- Updated PageHeader component to accept the `description` prop
+- Added proper rendering of description text in the PageHeader component
+- Ensured the component correctly handles both subtitle and description props
+- Fixed TypeScript error in BookingsPage by aligning props with PageHeader interface
+
+The issue was caused by a mismatch between the props defined in the PageHeader component interface and the props being passed to it from the BookingsPage component. The BookingsPage was using a `description` prop that wasn't defined in the PageHeader interface, causing a TypeScript error. The fix adds support for the description prop to the PageHeader component.

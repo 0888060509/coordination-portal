@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 
 interface PageHeaderProps {
   title: string;
+  description?: string;  // Added description prop
   subtitle?: string;
   actionLabel?: string;
   onAction?: () => void;
@@ -14,6 +15,7 @@ interface PageHeaderProps {
 
 const PageHeader = ({
   title,
+  description,
   subtitle,
   actionLabel,
   onAction,
@@ -30,6 +32,11 @@ const PageHeader = ({
           <Heading as="h1" className="text-2xl font-bold">
             {title}
           </Heading>
+          {description && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {description}
+            </p>
+          )}
           {subtitle && (
             <Heading as="h2" className="text-sm text-muted-foreground mt-1">
               {subtitle}
