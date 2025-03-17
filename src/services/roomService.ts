@@ -1,20 +1,22 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { RoomWithAmenities } from "@/types/room";
+import { RoomWithAmenities, Amenity } from "@/types/room";
 import { toast } from "@/hooks/use-toast";
 
-interface RoomFilters {
+// Define RoomFilterOptions interface to match what's used in RoomList.tsx
+export interface RoomFilterOptions {
   capacity?: number;
   location?: string;
   date?: Date;
   startTime?: string;
   endTime?: string;
   amenities?: string[];
+  searchQuery?: string;
 }
 
 export const roomService = {
   // Get all rooms with optional filtering
-  async getRooms(filters?: RoomFilters): Promise<RoomWithAmenities[]> {
+  async getRooms(filters?: RoomFilterOptions): Promise<RoomWithAmenities[]> {
     try {
       let query = supabase
         .from("rooms")
@@ -35,6 +37,10 @@ export const roomService = {
         query = query.ilike("location", `%${filters.location}%`);
       }
 
+      if (filters?.searchQuery) {
+        query = query.or(`name.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`);
+      }
+
       // Fetch rooms
       const { data: rooms, error } = await query;
 
@@ -43,12 +49,12 @@ export const roomService = {
       }
 
       // Transform data to match our RoomWithAmenities type
-      const transformedRooms = rooms.map((room) => {
+      const transformedRooms: RoomWithAmenities[] = rooms.map((room) => {
         const amenities = room.room_amenities.map(
           (ra: any) => ra.amenities
         );
 
-        return {
+        const transformedRoom: RoomWithAmenities = {
           id: room.id,
           name: room.name,
           capacity: room.capacity,
@@ -57,9 +63,13 @@ export const roomService = {
           room_number: room.room_number,
           description: room.description,
           image_url: room.image_url,
-          status: room.is_active ? "available" : "inactive",
+          is_active: room.is_active,
+          created_at: room.created_at,
+          updated_at: room.updated_at,
           amenities: amenities,
         };
+
+        return transformedRoom;
       });
 
       // If date and time filters are provided, check availability
@@ -161,7 +171,9 @@ export const roomService = {
         room_number: data.room_number,
         description: data.description,
         image_url: data.image_url,
-        status: data.is_active ? "available" : "inactive",
+        is_active: data.is_active,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
         amenities: amenities,
       };
     } catch (error) {
@@ -204,6 +216,57 @@ export const roomService = {
       return true;
     }
   },
+
+  // Get all amenities
+  async getAmenities(): Promise<Amenity[]> {
+    try {
+      const { data, error } = await supabase
+        .from("amenities")
+        .select("*")
+        .order("name");
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching amenities:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading amenities",
+        description: "Could not load amenities data. Please try again later.",
+      });
+      return [];
+    }
+  },
+
+  // Get all unique locations
+  async getLocations(): Promise<string[]> {
+    try {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("location")
+        .eq("is_active", true)
+        .order("location");
+
+      if (error) {
+        throw error;
+      }
+
+      // Extract unique locations
+      const locations = [...new Set(data.map(room => room.location))];
+      return locations;
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading locations",
+        description: "Could not load location data. Please try again later.",
+      });
+      return [];
+    }
+  }
 };
 
 export default roomService;

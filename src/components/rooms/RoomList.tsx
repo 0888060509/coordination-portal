@@ -39,7 +39,7 @@ import {
   Clock,
   MapPin,
 } from 'lucide-react';
-import { roomService, RoomFilterOptions } from '@/services/roomService';
+import roomService, { RoomFilterOptions } from '@/services/roomService';
 import { RoomWithAmenities, Amenity } from '@/types/room';
 
 import {
