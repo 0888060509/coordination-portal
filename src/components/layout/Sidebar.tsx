@@ -45,53 +45,60 @@ const Sidebar = () => {
             <NavItem 
               to="/dashboard" 
               icon={<LayoutDashboard />} 
-              label="Dashboard" 
               expanded={uiState.sidebarOpen}
-            />
+            >
+              Dashboard
+            </NavItem>
             
             <NavItem 
               to="/rooms" 
               icon={<BookOpen />} 
-              label="Rooms" 
               expanded={uiState.sidebarOpen}
-            />
+            >
+              Rooms
+            </NavItem>
             
             <NavItem 
               to="/bookings" 
               icon={<Calendar />} 
-              label="Bookings" 
               expanded={uiState.sidebarOpen}
-            />
+            >
+              Bookings
+            </NavItem>
             
             <NavItem 
               to="/notifications" 
               icon={<Bell />} 
-              label="Notifications" 
               expanded={uiState.sidebarOpen}
-            />
+            >
+              Notifications
+            </NavItem>
             
             {isAdmin && (
               <NavItem 
                 to="/admin" 
                 icon={<Users />} 
-                label="Admin" 
                 expanded={uiState.sidebarOpen}
-              />
+              >
+                Admin
+              </NavItem>
             )}
             
             <NavItem 
               to="/help" 
               icon={<HelpCircle />} 
-              label="Help" 
               expanded={uiState.sidebarOpen}
-            />
+            >
+              Help
+            </NavItem>
             
             <NavItem 
               to="/settings" 
               icon={<Settings />} 
-              label="Settings" 
               expanded={uiState.sidebarOpen}
-            />
+            >
+              Settings
+            </NavItem>
           </nav>
 
           <div className="p-4 border-t">

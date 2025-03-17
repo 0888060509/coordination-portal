@@ -1,37 +1,32 @@
 
 import { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { 
-  Calendar, 
-  Home, 
-  Users, 
-  DoorClosed, 
-  LayoutDashboard,
-  Shield
-} from "lucide-react";
-import { 
-  SidebarMenuItem, 
-  SidebarMenuButton 
-} from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 interface NavItemProps {
   icon: ReactNode;
   to: string;
-  isActive?: boolean;
-  children: ReactNode;
-  onClick?: () => void;
+  expanded: boolean;
+  children?: ReactNode;
 }
 
-const NavItem = ({ icon, to, children, isActive, onClick }: NavItemProps) => {
+const NavItem = ({ icon, to, expanded, children }: NavItemProps) => {
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={isActive}>
-        <NavLink to={to} onClick={onClick}>
-          {icon}
-          <span>{children}</span>
-        </NavLink>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
+    <NavLink 
+      to={to} 
+      className={({ isActive }) => cn(
+        "flex items-center py-2 px-3 rounded-md transition-colors",
+        expanded ? "justify-start" : "justify-center",
+        isActive 
+          ? "bg-primary/10 text-primary hover:bg-primary/20" 
+          : "hover:bg-muted text-muted-foreground hover:text-foreground"
+      )}
+    >
+      <span className={cn("flex-shrink-0", expanded && "mr-3")}>
+        {icon}
+      </span>
+      {expanded && <span className="truncate">{children}</span>}
+    </NavLink>
   );
 };
 

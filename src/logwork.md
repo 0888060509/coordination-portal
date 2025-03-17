@@ -29,3 +29,12 @@ The issue was caused by multiple sidebar implementations being rendered simultan
 
 The navigation issue was caused by incorrect route definitions and page component mappings. Some routes were pointing to placeholder components, causing navigation failures. The fix ensures that all routes correctly map to their respective page components.
 
+## 2025-03-17: Fixed NavItem Props Mismatch
+
+- Fixed TypeScript errors in `Sidebar.tsx` related to NavItem props
+- Updated NavItem component interface to properly define the expected props
+- Modified how props are passed from Sidebar to NavItem components
+- Replaced `label` prop with `children` to match React's standard pattern
+- Improved the styling of NavItem to better handle expanded and collapsed states
+
+The issue was caused by a mismatch between the props expected by the NavItem component and the props being passed to it from the Sidebar. The NavItem component expected props like `expanded` and `children`, but was receiving `label` and `expanded`. The fix ensures that the correct props are used consistently.
