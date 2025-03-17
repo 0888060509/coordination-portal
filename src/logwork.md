@@ -1,5 +1,4 @@
 
-
 # LogWork - 2024
 
 ## June 13, 2024
@@ -79,3 +78,10 @@
 - Improved error handling for date parsing and conversion
 - Enhanced type safety across room availability-related functionality
 
+## June 21, 2024
+- Fixed import issues with the LoadingSpinner component in AvailabilityIndicator and RoomAvailabilityCalendar
+- Changed import syntax from `import { LoadingSpinner }` to `import LoadingSpinner`
+- Fixed Date comparison operators in RoomAvailabilityCalendar by converting dates to milliseconds
+- Added the onDateSelect prop to RoomAvailabilityCalendarProps interface
+- Improved type safety in date comparisons throughout the calendar component
+- Added proper handling for the optional onDateSelect callback

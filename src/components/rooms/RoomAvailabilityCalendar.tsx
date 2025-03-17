@@ -7,14 +7,18 @@ import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfDay, addDays, isToday, isSameDay } from 'date-fns';
 import { getRoomAvailability } from '@/services/roomService';
 import { AvailabilityCheckResult } from '@/types/room.service';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import LoadingSpinner from '@/components/ui/loading-spinner';
 import AvailabilityIndicator from './AvailabilityIndicator';
 
 interface RoomAvailabilityCalendarProps {
   roomId: string;
+  onDateSelect?: (date: Date) => void;
 }
 
-const RoomAvailabilityCalendar: React.FC<RoomAvailabilityCalendarProps> = ({ roomId }) => {
+const RoomAvailabilityCalendar: React.FC<RoomAvailabilityCalendarProps> = ({ 
+  roomId,
+  onDateSelect 
+}) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [view, setView] = useState<'day' | 'week'>('day');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -87,10 +91,14 @@ const RoomAvailabilityCalendar: React.FC<RoomAvailabilityCalendarProps> = ({ roo
         ? parseISO(booking.end_time).getTime()
         : new Date(booking.end_time).getTime();
       
+      // Convert dates to milliseconds for comparison
+      const slotStartMs = slotStart.getTime();
+      const slotEndMs = slotEnd.getTime();
+      
       return (
-        (slotStart >= bookingStart && slotStart < bookingEnd) || // Slot starts during booking
-        (slotEnd > bookingStart && slotEnd <= bookingEnd) || // Slot ends during booking
-        (slotStart <= bookingStart && slotEnd >= bookingEnd) // Slot contains booking
+        (slotStartMs >= bookingStart && slotStartMs < bookingEnd) || // Slot starts during booking
+        (slotEndMs > bookingStart && slotEndMs <= bookingEnd) || // Slot ends during booking
+        (slotStartMs <= bookingStart && slotEndMs >= bookingEnd) // Slot contains booking
       );
     });
   };
@@ -107,6 +115,9 @@ const RoomAvailabilityCalendar: React.FC<RoomAvailabilityCalendarProps> = ({ roo
 
   const handleDayClick = (date: Date) => {
     setSelectedDate(date);
+    if (onDateSelect) {
+      onDateSelect(date);
+    }
   };
 
   return (

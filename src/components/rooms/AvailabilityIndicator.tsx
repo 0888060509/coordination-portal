@@ -4,7 +4,7 @@ import { CheckCircle, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { getRoomAvailability } from '@/services/roomService';
 import { AvailabilityCheckResult } from '@/types/room.service';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import LoadingSpinner from '@/components/ui/loading-spinner';
 
 interface AvailabilityIndicatorProps {
   roomId: string;
