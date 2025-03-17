@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { ThemeProvider } from "@/components/theme-provider";
+import { AppProviders } from '@/context/AppProviders';
 import { useTheme } from 'next-themes';
 import Login from './pages/auth/LoginPage';
 import Register from './pages/auth/RegisterPage';
@@ -33,7 +33,7 @@ const App = () => {
   };
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <AppProviders>
       <Routes>
         <Route path="/" element={<IndexPage />} />
         
@@ -61,7 +61,7 @@ const App = () => {
         
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </ThemeProvider>
+    </AppProviders>
   );
 };
 
