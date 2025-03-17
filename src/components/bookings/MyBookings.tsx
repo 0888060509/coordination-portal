@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { BookingWithDetails } from '@/types/booking';
@@ -158,8 +157,6 @@ const MyBookings: React.FC = () => {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="upcoming" className="space-y-4">
-              {isLoading && <p>Loading upcoming bookings...</p>}
-              {error && <p className="text-red-500">Error: {(error as Error).message}</p>}
               {upcomingBookings && upcomingBookings.length > 0 ? (
                 <BookingsList
                   bookings={upcomingBookings}
@@ -172,8 +169,6 @@ const MyBookings: React.FC = () => {
               )}
             </TabsContent>
             <TabsContent value="past" className="space-y-4">
-              {isLoading && <p>Loading past bookings...</p>}
-              {error && <p className="text-red-500">Error: {(error as Error).message}</p>}
               {pastBookings && pastBookings.length > 0 ? (
                 <BookingsList
                   bookings={pastBookings}
