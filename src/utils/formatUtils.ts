@@ -1,4 +1,3 @@
-
 export function formatDuration(minutes: number): string {
   if (minutes < 1) return "0m";
   
@@ -24,3 +23,11 @@ export function formatTimeRange(startTime: string, endTime: string): string {
   
   return `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
+
+// Parse time string (HH:MM) to Date object
+export const parseTimeString = (timeString: string, baseDate: Date): Date => {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const result = new Date(baseDate);
+  result.setHours(hours, minutes, 0, 0);
+  return result;
+};
