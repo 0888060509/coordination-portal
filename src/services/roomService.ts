@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { RoomWithAmenities, Amenity, RoomFilterOptions } from "@/types/index";
 import { toast } from "@/hooks/use-toast";
@@ -308,6 +307,103 @@ export const roomService = {
         title: "Error loading locations",
         description: "Could not load location data. Please try again later.",
       });
+      return [];
+    }
+  },
+
+  // Get room availability for a date range
+  async getRoomAvailability(
+    roomId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<{
+    bookings: {
+      id: string;
+      start_time: Date | string;
+      end_time: Date | string;
+      title: string;
+    }[];
+    is_available: boolean;
+  }> {
+    try {
+      // Fetch bookings for this room in the specified date range
+      const { data: bookings, error } = await supabase
+        .from("bookings")
+        .select("id, start_time, end_time, title")
+        .eq("room_id", roomId)
+        .eq("status", "confirmed") // Only consider confirmed bookings
+        .gte("start_time", startDate.toISOString())
+        .lte("end_time", endDate.toISOString());
+
+      if (error) {
+        throw error;
+      }
+
+      // Check if room is generally available (not under maintenance, etc.)
+      const { data: room, error: roomError } = await supabase
+        .from("rooms")
+        .select("status")
+        .eq("id", roomId)
+        .single();
+
+      if (roomError) {
+        throw roomError;
+      }
+
+      return {
+        bookings: bookings || [],
+        is_available: room.status === 'available'
+      };
+    } catch (error) {
+      console.error("Error fetching room availability:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading availability",
+        description: "Could not load room availability. Please try again later.",
+      });
+      return { bookings: [], is_available: false };
+    }
+  },
+  
+  // Get floor plans for a room
+  async getRoomFloorPlan(roomId: string): Promise<string | null> {
+    try {
+      // This function assumes there's a column for floor plan images
+      // If there isn't one, you'd need to add it to the database
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("floor_plan_url")
+        .eq("id", roomId)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data?.floor_plan_url || null;
+    } catch (error) {
+      console.error("Error fetching room floor plan:", error);
+      return null;
+    }
+  },
+  
+  // Get additional room images
+  async getRoomImages(roomId: string): Promise<string[]> {
+    try {
+      // This would assume there's a room_images table
+      // If there isn't one, you'd need to add it to the database
+      const { data, error } = await supabase
+        .from("room_images")
+        .select("image_url")
+        .eq("room_id", roomId);
+
+      if (error) {
+        throw error;
+      }
+
+      return data?.map(img => img.image_url) || [];
+    } catch (error) {
+      console.error("Error fetching room images:", error);
       return [];
     }
   }
