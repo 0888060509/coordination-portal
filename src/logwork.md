@@ -20,3 +20,8 @@
 - Created menu component for user dropdown
 - Fixed import path issues across the project
 - Improved responsive layout for mobile devices
+
+## 2023-08-14
+- Fixed menu component imports in Header component
+- Added useAuth alias in AuthContext for backwards compatibility
+- Fixed build errors related to missing exports and imports

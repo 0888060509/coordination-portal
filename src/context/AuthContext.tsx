@@ -13,6 +13,8 @@ interface AuthContextType {
   user: User | null;
   signOut: () => Promise<void>;
   isLoading: boolean;
+  isAuthenticated?: boolean;
+  authInitialized?: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,6 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   // Mock signOut function
   const signOut = async () => {
@@ -39,16 +42,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       });
       setIsLoading(false);
+      setAuthInitialized(true);
     }, 1000);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, signOut, isLoading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      signOut, 
+      isLoading, 
+      isAuthenticated: !!user,
+      authInitialized 
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
+// Original hook
 export const useAuthContext = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -56,3 +67,6 @@ export const useAuthContext = () => {
   }
   return context;
 };
+
+// Alias for compatibility with existing code
+export const useAuth = useAuthContext;
