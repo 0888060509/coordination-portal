@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { BookingWithDetails } from '@/types/booking';
@@ -46,6 +47,11 @@ const MyBookings: React.FC = () => {
   const handleViewDetails = (booking: BookingWithDetails) => {
     setSelectedBooking(booking);
     setIsDetailsOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setIsDetailsOpen(false);
+    setSelectedBooking(null);
   };
 
   const handleEditBooking = (booking: BookingWithDetails) => {

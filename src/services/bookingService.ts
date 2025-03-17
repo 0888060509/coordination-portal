@@ -1,5 +1,7 @@
+
 import { supabase } from '@/lib/supabase';
-import { BookingWithDetails, CreateBookingData } from '@/types/booking';
+import { BookingWithDetails, CreateBookingData, RecurringPattern } from '@/types/booking';
+import { Booking } from '@/types/index';
 import { toast } from '@/hooks/use-toast';
 
 // Get a booking by ID with related details
