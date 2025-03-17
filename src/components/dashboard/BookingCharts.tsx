@@ -14,7 +14,7 @@ export function BookingCharts({ stats }: BookingChartsProps) {
   const [chartTab, setChartTab] = useState("month");
   
   // For pie chart
-  const pieColors = ["#2563eb", "#4f46e5", "#7c3aed", "#9333ea", "#c026d3", "#db2777"];
+  const pieColors = ["#9b87f5", "#7E69AB", "#6E59A5", "#8B5CF6", "#D946EF", "#F97316", "#0EA5E9"];
   
   const weekdayData = stats.bookingsByWeekday || [];
   const monthData = stats.bookingsByMonth || [];
@@ -45,7 +45,7 @@ export function BookingCharts({ stats }: BookingChartsProps) {
           <div className="h-[300px]">
             <ChartContainer
               config={{
-                main: { color: "#2563eb" }
+                main: { color: "#9b87f5" }
               }}
             >
               <ResponsiveContainer width="100%" height="100%">
@@ -83,13 +83,13 @@ export function BookingCharts({ stats }: BookingChartsProps) {
           <div className="h-[300px]">
             <ChartContainer
               config={{
-                monday: { color: "#2563eb" },
-                tuesday: { color: "#4f46e5" },
-                wednesday: { color: "#7c3aed" },
-                thursday: { color: "#9333ea" },
-                friday: { color: "#c026d3" },
-                saturday: { color: "#db2777" },
-                sunday: { color: "#e11d48" }
+                monday: { color: "#9b87f5" },
+                tuesday: { color: "#7E69AB" },
+                wednesday: { color: "#6E59A5" },
+                thursday: { color: "#8B5CF6" },
+                friday: { color: "#D946EF" },
+                saturday: { color: "#F97316" },
+                sunday: { color: "#0EA5E9" }
               }}
             >
               <ResponsiveContainer width="100%" height="100%">
@@ -110,6 +110,7 @@ export function BookingCharts({ stats }: BookingChartsProps) {
                     ))}
                   </Pie>
                   <Tooltip content={<ChartTooltipContent />} />
+                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             </ChartContainer>
