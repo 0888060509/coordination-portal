@@ -1,8 +1,10 @@
+
 import { ApiService } from './apiService';
 import { supabase } from '../lib/supabase';
 import { Room, Amenity } from '../types/room';
-import { RoomDetails, TimeSlot, RoomFilters, AvailabilityCheckResult } from '../types/room.service';
+import { RoomWithAmenities } from '../types/room';
 import { ApiError } from '../utils/errors';
+import { RoomDetails, TimeSlot, RoomFilters, AvailabilityCheckResult } from '../types/room.service';
 
 export class RoomService extends ApiService {
   /**

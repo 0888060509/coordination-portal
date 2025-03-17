@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,11 +100,11 @@ const RoomAvailabilityCalendar = ({
     return !availabilityData.conflicting_bookings.some(booking => {
       const bookingStart = typeof booking.start_time === 'string' 
         ? parseISO(booking.start_time).getTime()
-        : booking.start_time.getTime();
+        : new Date(booking.start_time).getTime();
         
       const bookingEnd = typeof booking.end_time === 'string'
         ? parseISO(booking.end_time).getTime()
-        : booking.end_time.getTime();
+        : new Date(booking.end_time).getTime();
       
       return (
         (slotStart >= bookingStart && slotStart < bookingEnd) || // Slot starts during booking

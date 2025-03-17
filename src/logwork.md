@@ -1,4 +1,5 @@
 
+
 # LogWork - 2024
 
 ## June 13, 2024
@@ -66,3 +67,6 @@
 - Added proper ApiError imports in roomService
 - Updated RoomService.getRoomAvailabilitySchedule to return AvailabilityCheckResult
 - Improved type safety across room availability components
+- Fixed booking time handling in RoomAvailabilityCalendar with proper date parsing
+- Updated RoomService to properly import and use RoomWithAmenities type
+
