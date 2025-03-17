@@ -1,12 +1,12 @@
 
-import { supabase, handleSupabaseError } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { Booking, BookingWithDetails, CreateBookingData } from '@/types/booking';
 import { UserProfile } from '@/types/booking';
 import { toast } from '@/hooks/use-toast';
 
 export const bookingService = {
   // Get all bookings for the current user
-  async getUserBookings(): Promise<BookingWithDetails[]> {
+  async getUserBookings(filters = {}): Promise<BookingWithDetails[]> {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
@@ -15,15 +15,39 @@ export const bookingService = {
         throw new Error('User not authenticated');
       }
 
-      // First, get all bookings for the current user
-      const { data: bookingsData, error: bookingsError } = await supabase
+      // Build the query with base filters
+      let query = supabase
         .from('bookings')
         .select(`
           *,
           rooms (*)
         `)
-        .eq('user_id', userId)
-        .order('start_time', { ascending: true });
+        .eq('user_id', userId);
+      
+      // Apply additional filters if provided
+      if (filters && typeof filters === 'object') {
+        // Filter by status if provided
+        if ('status' in filters && filters.status) {
+          query = query.eq('status', filters.status);
+        }
+        
+        // Filter by date range if provided
+        if ('startDate' in filters && filters.startDate) {
+          query = query.gte('start_time', new Date(filters.startDate as string).toISOString());
+        }
+        
+        if ('endDate' in filters && filters.endDate) {
+          query = query.lte('end_time', new Date(filters.endDate as string).toISOString());
+        }
+        
+        // Filter by room if provided
+        if ('roomId' in filters && filters.roomId) {
+          query = query.eq('room_id', filters.roomId);
+        }
+      }
+      
+      // Execute the query with ordering
+      const { data: bookingsData, error: bookingsError } = await query.order('start_time', { ascending: true });
 
       if (bookingsError) {
         throw bookingsError;
@@ -87,11 +111,30 @@ export const bookingService = {
         throw profileError;
       }
 
+      // Get attendees if there are any
+      let attendees = [];
+      if (bookingData.attendees && bookingData.attendees.length > 0) {
+        const { data: attendeesData, error: attendeesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', bookingData.attendees);
+        
+        if (!attendeesError && attendeesData) {
+          attendees = attendeesData.map(profile => ({
+            id: profile.id,
+            name: `${profile.first_name} ${profile.last_name}`,
+            email: profile.email,
+            isExternal: false
+          }));
+        }
+      }
+
       // Format the data to match our BookingWithDetails type
       const booking = {
         ...bookingData,
         room: bookingData.rooms,
         user: profileData,
+        attendees,
         rooms: undefined,
       } as unknown as BookingWithDetails;
 
@@ -140,6 +183,23 @@ export const bookingService = {
         await this.addAttendeesToBooking(data as string, bookingData.attendees);
       }
 
+      // If we have additional data, update the booking
+      if (
+        bookingData.meeting_type ||
+        bookingData.equipment_needed ||
+        bookingData.special_requests ||
+        bookingData.recurring_pattern_id
+      ) {
+        const additionalData: any = {};
+        
+        if (bookingData.meeting_type) additionalData.meeting_type = bookingData.meeting_type;
+        if (bookingData.equipment_needed) additionalData.equipment_needed = bookingData.equipment_needed;
+        if (bookingData.special_requests) additionalData.special_requests = bookingData.special_requests;
+        if (bookingData.recurring_pattern_id) additionalData.recurring_pattern_id = bookingData.recurring_pattern_id;
+        
+        await this.updateBooking(data as string, additionalData);
+      }
+
       return data as string;
     } catch (error) {
       console.error('Error creating booking:', error);
@@ -170,22 +230,34 @@ export const bookingService = {
   },
 
   // Update an existing booking
-  async updateBooking(id: string, bookingData: Partial<Booking>): Promise<void> {
+  async updateBooking(id: string, bookingData: Partial<Booking | CreateBookingData>): Promise<void> {
     try {
+      // Prepare the update data
+      const updateData: any = { ...bookingData };
+      
+      // Convert Date objects to ISO strings for Supabase
+      if (updateData.start_time instanceof Date) {
+        updateData.start_time = updateData.start_time.toISOString();
+      }
+      
+      if (updateData.end_time instanceof Date) {
+        updateData.end_time = updateData.end_time.toISOString();
+      }
+      
       // If updating times, check availability first
-      if (bookingData.start_time && bookingData.end_time) {
+      if (updateData.start_time && updateData.end_time) {
         // Validate booking times
         if (!this.validateBookingTimes(
-          new Date(bookingData.start_time), 
-          new Date(bookingData.end_time)
+          new Date(updateData.start_time), 
+          new Date(updateData.end_time)
         )) {
           throw new Error('Invalid booking times. Please check your start and end times.');
         }
 
         const isAvailable = await this.isRoomAvailable(
-          bookingData.room_id!,
-          new Date(bookingData.start_time),
-          new Date(bookingData.end_time),
+          updateData.room_id || (await this.getBookingById(id))?.room_id,
+          new Date(updateData.start_time),
+          new Date(updateData.end_time),
           id
         );
 
@@ -196,11 +268,23 @@ export const bookingService = {
 
       const { error } = await supabase
         .from('bookings')
-        .update(bookingData)
+        .update(updateData)
         .eq('id', id);
 
       if (error) {
         throw error;
+      }
+      
+      // If we have attendees, update them
+      if (bookingData.attendees) {
+        // First, remove existing attendees
+        await supabase
+          .from('booking_attendees')
+          .delete()
+          .eq('booking_id', id);
+        
+        // Then add the new ones
+        await this.addAttendeesToBooking(id, bookingData.attendees as string[]);
       }
     } catch (error) {
       console.error('Error updating booking:', error);
@@ -209,18 +293,78 @@ export const bookingService = {
   },
 
   // Cancel a booking
-  async cancelBooking(id: string): Promise<void> {
+  async cancelBooking(id: string, reason: string = ""): Promise<void> {
     try {
+      const updateData: any = { 
+        status: 'cancelled',
+        cancellation_reason: reason || null
+      };
+      
       const { error } = await supabase
         .from('bookings')
-        .update({ status: 'cancelled' })
+        .update(updateData)
         .eq('id', id);
 
       if (error) {
         throw error;
       }
+      
+      // Notify attendees of cancellation
+      try {
+        const booking = await this.getBookingById(id);
+        if (booking && booking.attendees && booking.attendees.length > 0) {
+          // This would typically call a notification service
+          console.log(`Notifying ${booking.attendees.length} attendees of cancellation`);
+        }
+      } catch (err) {
+        console.error('Error notifying attendees:', err);
+        // Don't fail the cancellation if notification fails
+      }
     } catch (error) {
       console.error('Error cancelling booking:', error);
+      throw error;
+    }
+  },
+
+  // Cancel recurring bookings
+  async cancelRecurringBookings(patternId: string, cancelType: 'single' | 'future' | 'all', instanceId: string, reason: string = ""): Promise<void> {
+    try {
+      // Get the booking details
+      const booking = await this.getBookingById(instanceId);
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+      
+      if (cancelType === 'single') {
+        // Just cancel this instance
+        await this.cancelBooking(instanceId, reason);
+      } else if (cancelType === 'future') {
+        // Cancel this and all future instances
+        const { error } = await supabase.rpc('cancel_future_recurring_bookings', {
+          p_pattern_id: patternId,
+          p_from_date: new Date(booking.start_time).toISOString(),
+          p_reason: reason || null
+        });
+        
+        if (error) {
+          throw error;
+        }
+      } else if (cancelType === 'all') {
+        // Cancel all instances
+        const { error } = await supabase
+          .from('bookings')
+          .update({ 
+            status: 'cancelled',
+            cancellation_reason: reason || null
+          })
+          .eq('recurring_pattern_id', patternId);
+        
+        if (error) {
+          throw error;
+        }
+      }
+    } catch (error) {
+      console.error('Error cancelling recurring bookings:', error);
       throw error;
     }
   },
