@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/loading-spinner";
@@ -20,41 +20,92 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const [hasTriedProcessing, setHasTriedProcessing] = useState(false);
   const [verifyingSession, setVerifyingSession] = useState(false);
   const [authProcessComplete, setAuthProcessComplete] = useState(false);
+  
+  const hasNavigatedRef = useRef(false);
 
   const hasAuthHash = location.hash && location.hash.includes('access_token');
-  
-  // Enhanced session verification with forced navigation as fallback
+
   useEffect(() => {
+    const authSuccess = localStorage.getItem('auth_success');
+    const authTimestamp = localStorage.getItem('auth_timestamp');
+    
+    if (authSuccess === 'true' && authTimestamp) {
+      const timestamp = parseInt(authTimestamp, 10);
+      const now = Date.now();
+      const fiveMinutesMs = 5 * 60 * 1000;
+      
+      if (now - timestamp < fiveMinutesMs) {
+        console.log("Found recent auth success in localStorage");
+        if (window.location.pathname !== '/dashboard') {
+          console.log("Redirecting to dashboard based on localStorage");
+          navigate('/dashboard', { replace: true });
+        }
+      }
+    }
+  }, [navigate]);
+  
+  useEffect(() => {
+    let isMounted = true;
+    
     if (isAuthenticated && !user && !isLoading && !verifyingSession) {
       const checkSession = async () => {
+        if (!isMounted) return;
+        
         setVerifyingSession(true);
         try {
           console.log("Verifying session validity");
           const isValid = await verifySession();
+          
+          if (!isMounted) return;
+          
           if (!isValid) {
             console.log("Session invalid, redirecting to login");
+            localStorage.removeItem('auth_success');
+            localStorage.removeItem('auth_timestamp');
+            
             toast({
               variant: "destructive",
               title: "Session expired",
               description: "Your session has expired. Please sign in again.",
             });
-            navigate("/login", { replace: true });
+            
+            if (!hasNavigatedRef.current) {
+              hasNavigatedRef.current = true;
+              navigate("/login", { replace: true });
+            }
           } else {
             console.log("Session verified successfully");
+            
+            if ((location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/') && !hasNavigatedRef.current) {
+              console.log("Valid session but on auth page, redirecting to dashboard");
+              hasNavigatedRef.current = true;
+              navigate('/dashboard', { replace: true });
+            }
           }
         } catch (error) {
           console.error("Error verifying session:", error);
-          navigate("/login", { replace: true });
+          
+          if (!isMounted) return;
+          
+          if (!hasNavigatedRef.current) {
+            hasNavigatedRef.current = true;
+            navigate("/login", { replace: true });
+          }
         } finally {
-          setVerifyingSession(false);
+          if (isMounted) {
+            setVerifyingSession(false);
+          }
         }
       };
       
       checkSession();
     }
-  }, [isAuthenticated, user, isLoading, navigate, verifyingSession]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, user, isLoading, navigate, verifyingSession, location.pathname]);
 
-  // Simplified auth hash processing
   useEffect(() => {
     let isMounted = true;
     
@@ -68,7 +119,6 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
         try {
           console.log("ProtectedRoute: Processing auth hash manually, attempt:", processingAttempts + 1);
           
-          // Clear hash from URL to prevent loops
           if (window.history && window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           }
@@ -80,6 +130,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           if (!session) {
             console.error("Failed to process auth hash");
             setProcessingAttempts(prev => prev + 1);
+            
             toast({
               variant: "destructive",
               title: "Authentication problem",
@@ -89,19 +140,27 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             console.log("Auth hash processed successfully");
             setAuthProcessComplete(true);
             
-            // Force navigation after successful hash processing
-            setTimeout(() => {
-              if (window.location.pathname.includes('login')) {
-                console.log("Forcing navigation to dashboard after successful hash processing");
-                navigate('/dashboard', { replace: true });
-              }
-            }, 500);
+            localStorage.setItem('auth_success', 'true');
+            localStorage.setItem('auth_timestamp', Date.now().toString());
+            
+            if (!hasNavigatedRef.current) {
+              hasNavigatedRef.current = true;
+              navigate('/dashboard', { replace: true });
+              
+              setTimeout(() => {
+                if (window.location.pathname.includes('login')) {
+                  console.log("Still on login page after hash processing, forcing direct navigation");
+                  window.location.href = '/dashboard';
+                }
+              }, 500);
+            }
           }
         } catch (error) {
           if (!isMounted) return;
           
           console.error("Error processing auth hash:", error);
           setProcessingAttempts(prev => prev + 1);
+          
           toast({
             variant: "destructive",
             title: "Authentication error",
@@ -122,78 +181,23 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     };
   }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts, navigate, hasTriedProcessing, authProcessComplete]);
 
-  // Clearer navigation for authenticated users
   useEffect(() => {
-    if (isAuthenticated && !processingAuth && !isLoading) {
+    if (isAuthenticated && !processingAuth && !isLoading && !hasNavigatedRef.current) {
       const currentPath = window.location.pathname;
       if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
         console.log("Authenticated user on auth page, redirecting to dashboard");
+        hasNavigatedRef.current = true;
         navigate('/dashboard', { replace: true });
+        
+        setTimeout(() => {
+          if (window.location.pathname !== '/dashboard') {
+            window.location.href = '/dashboard';
+          }
+        }, 500);
       }
     }
-  }, [isAuthenticated, processingAuth, isLoading, navigate]);
+  }, [isAuthenticated, processingAuth, isLoading, navigate, hasNavigatedRef]);
 
-  // More aggressive timeout handling with auto-retry
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    let longTimeoutId: NodeJS.Timeout;
-    let retryTimeoutId: NodeJS.Timeout;
-    
-    if ((isLoading || (hasAuthHash && processingAuth)) && !isAuthenticated) {
-      // First timeout - show message
-      timeoutId = setTimeout(() => {
-        console.log("Authentication loading timeout reached");
-        setAuthTimeout(true);
-        
-        if (hasAuthHash) {
-          toast({
-            variant: "destructive",
-            title: "Authentication taking longer than expected",
-            description: "You can try again or go back to login page.",
-          });
-        }
-      }, 5000);
-      
-      // Second timeout - auto retry once
-      retryTimeoutId = setTimeout(() => {
-        if (hasAuthHash && processingAuth && processingAttempts < 2) {
-          console.log("Auto-retrying authentication");
-          retryAuth();
-        }
-      }, 8000);
-      
-      // Final timeout - redirect
-      longTimeoutId = setTimeout(() => {
-        toast({
-          variant: "destructive",
-          title: "Authentication problem",
-          description: "There was a problem completing your authentication. Please try logging in again.",
-        });
-        
-        if (isLoading || processingAuth) {
-          console.log("Final timeout reached, redirecting to login");
-          navigate('/login', { replace: true });
-        }
-      }, 15000);
-    } else {
-      setAuthTimeout(false);
-    }
-    
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (retryTimeoutId) clearTimeout(retryTimeoutId);
-      if (longTimeoutId) clearTimeout(longTimeoutId);
-    };
-  }, [isLoading, hasAuthHash, processingAuth, navigate, processingAttempts, isAuthenticated]);
-
-  // Add immediate navigation when authenticated
-  useEffect(() => {
-    if (isAuthenticated && !processingAuth) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isAuthenticated, processingAuth, navigate]);
-
-  // Improved retry authentication with more explicit logging
   const retryAuth = async () => {
     if (hasAuthHash) {
       setAuthTimeout(false);
@@ -240,7 +244,6 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             description: "You are now logged in.",
           });
           
-          // Force navigation after successful manual authentication
           setTimeout(() => {
             navigate('/dashboard', { replace: true });
           }, 1000);
@@ -263,7 +266,6 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             description: "You are now logged in.",
           });
           
-          // Force navigation after successful processAuthHash
           setTimeout(() => {
             navigate('/dashboard', { replace: true });
           }, 1000);
@@ -281,7 +283,6 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     }
   };
 
-  // Simpler navigation function
   const goToLogin = () => {
     if (window.history && window.history.replaceState) {
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -295,19 +296,21 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     navigate('/login', { replace: true });
   };
 
-  // Enhanced loading detection
   const showLoading = isLoading || (hasAuthHash && processingAuth) || verifyingSession;
 
-  // Additional effect to detect stalled auth and force navigation
   useEffect(() => {
-    // If auth is complete but we're still on login page, force navigate
-    if (isAuthenticated && !isLoading && location.pathname.includes('login')) {
+    if (isAuthenticated && !isLoading && location.pathname.includes('login') && !hasNavigatedRef.current) {
       console.log("Authentication is complete but still on login page, navigating to dashboard");
+      hasNavigatedRef.current = true;
+      navigate('/dashboard', { replace: true });
+      
       setTimeout(() => {
-        navigate('/dashboard', { replace: true });
+        if (window.location.pathname.includes('login')) {
+          window.location.href = '/dashboard';
+        }
       }, 500);
     }
-  }, [isAuthenticated, isLoading, navigate, location.pathname]);
+  }, [isAuthenticated, isLoading, navigate, location.pathname, hasNavigatedRef]);
 
   if (showLoading) {
     return (

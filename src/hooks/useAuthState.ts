@@ -24,46 +24,59 @@ export const useAuthState = ({
 
   // Check if the user is already logged in and set up auth state change listener
   useEffect(() => {
+    // Create flag to track if this component is mounted
+    let isMounted = true;
+    const navigationAttempted = { value: false };
+    
     const checkAuth = async () => {
       try {
         console.log("Initial auth check starting");
-        setIsLoading(true);
+        if (isMounted) setIsLoading(true);
         
         // Get current session
         const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
+        if (isMounted) setSession(session);
         
         console.log("Initial session check:", session ? `Session found for ${session.user.id}` : "No session found");
         
         if (session?.user) {
           const userData = await fetchProfile(session.user.id, session);
-          if (userData) {
+          if (userData && isMounted) {
             console.log("Initial profile loaded successfully");
             setUser(userData);
             setIsAdmin(userData.role === 'admin');
             
             // Force navigation for already logged in users
             const currentPath = window.location.pathname;
-            if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+            if ((currentPath === '/login' || currentPath === '/register' || currentPath === '/') && !navigationAttempted.value) {
               console.log("User already logged in, redirecting to dashboard");
+              navigationAttempted.value = true;
+              
+              // React Router navigation
+              navigate('/dashboard', { replace: true });
+              
+              // Fallback navigation with delay
               setTimeout(() => {
-                navigate('/dashboard', { replace: true });
-              }, 100);
+                if (window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/') {
+                  console.log("Still on auth page, forcing direct navigation");
+                  window.location.href = '/dashboard';
+                }
+              }, 500);
             }
-          } else {
+          } else if (isMounted) {
             console.warn("Initial profile fetch failed");
             setUser(null);
             setIsAdmin(false);
           }
-        } else {
+        } else if (isMounted) {
           console.log("No initial session found");
           setUser(null);
           setIsAdmin(false);
         }
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       } catch (error) {
         console.error("Initial auth check error:", error);
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
@@ -74,46 +87,54 @@ export const useAuthState = ({
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event, session ? `Session exists for ${session.user.id}` : "No session");
-        setSession(session);
+        if (isMounted) setSession(session);
+        
+        if (event === 'SIGNED_IN' && session) {
+          // Store login success in localStorage
+          localStorage.setItem('auth_success', 'true');
+          localStorage.setItem('auth_timestamp', Date.now().toString());
+        }
         
         if (session?.user) {
-          setIsLoading(true);
+          if (isMounted) setIsLoading(true);
           try {
             const userData = await fetchProfile(session.user.id, session);
-            if (userData) {
+            if (userData && isMounted) {
               console.log("Profile loaded after auth state change");
               setUser(userData);
               setIsAdmin(userData.role === 'admin');
-            } else {
+            } else if (isMounted) {
               console.warn("Profile fetch failed after auth state change");
               setUser(null);
               setIsAdmin(false);
             }
           } catch (error) {
             console.error("Error fetching profile after auth state change:", error);
-            setUser(null);
-            setIsAdmin(false);
+            if (isMounted) {
+              setUser(null);
+              setIsAdmin(false);
+            }
           }
-          setIsLoading(false);
+          if (isMounted) setIsLoading(false);
           
-          // Explicitly navigate to dashboard for SIGNED_IN events
-          if (event === 'SIGNED_IN') {
+          // Skip normal navigation for SIGNED_IN since it's handled directly in login
+          if (event === 'SIGNED_IN' && !navigationAttempted.value) {
             console.log("Auth event SIGNED_IN, navigating to dashboard");
-            // Short delay to ensure state is updated before navigation
-            setTimeout(() => {
-              navigate('/dashboard', { replace: true });
-            }, 100);
+            navigationAttempted.value = true;
             
-            // Extra fallback navigation for edge cases
+            // Navigation with multiple methods
+            navigate('/dashboard', { replace: true });
+            
+            // Fallback navigation with delay
             setTimeout(() => {
               const currentPath = window.location.pathname;
               if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
                 console.log("Still on auth page after SIGNED_IN event, forcing navigation");
-                navigate('/dashboard', { replace: true });
+                window.location.href = '/dashboard';
               }
-            }, 1000);
+            }, 500);
           }
-        } else {
+        } else if (isMounted) {
           console.log("No user in session after auth state change");
           setUser(null);
           setIsAdmin(false);
@@ -121,6 +142,9 @@ export const useAuthState = ({
           
           // Handle signed out event
           if (event === 'SIGNED_OUT') {
+            navigationAttempted.value = false; // Reset navigation flag
+            localStorage.removeItem('auth_success');
+            localStorage.removeItem('auth_timestamp');
             navigate('/login');
           }
         }
@@ -146,6 +170,7 @@ export const useAuthState = ({
     // Cleanup subscription on unmount
     return () => {
       console.log("Cleaning up auth state subscription");
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [navigate, setIsAdmin, setIsLoading, setSession, setUser]);

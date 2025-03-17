@@ -24,10 +24,10 @@ export const useAuthMethods = (
     let loginError: AuthError | undefined;
     
     try {
-      console.log("Attempting direct login for email:", email);
+      console.log("Attempting hardcoded login for email:", email);
       setIsLoading(true);
       
-      // Step 1: Sign in with password - core auth operation
+      // STEP 1: Core authentication operation
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -63,54 +63,55 @@ export const useAuthMethods = (
       
       console.log("Login successful, session created:", data.session.user.id);
       
-      // Step 2: Set session state immediately
+      // STEP 2: Store success indicator in localStorage
+      localStorage.setItem('auth_success', 'true');
+      localStorage.setItem('auth_timestamp', Date.now().toString());
+      
+      // STEP 3: Set session and user data synchronously
       setSession(data.session);
       
-      // Step 3: Fetch user profile data directly
-      let userData: User | null = null;
+      // STEP 4: Try to get user profile data
       try {
-        userData = await fetchProfile(data.user.id, data.session);
-        
+        const userData = await fetchProfile(data.user.id, data.session);
         if (userData) {
           console.log("User profile fetched successfully");
-          // Set user data immediately
           setUser(userData);
           setIsAdmin(userData.role === 'admin');
-          
-          // Immediate success message
-          toast({
-            title: "Login successful",
-            description: "Welcome back to MeetingMaster!",
-          });
-        } else {
-          console.error("Failed to fetch user profile after login");
-          toast({
-            variant: "destructive",
-            title: "Login incomplete",
-            description: "Your account was authenticated but we couldn't load your profile.",
-          });
         }
       } catch (profileError) {
         console.error("Error fetching user profile:", profileError);
+        // Continue with login even if profile fetch fails
       }
       
-      // Step 4: Force immediate navigation regardless of profile fetch result
-      console.log("Forcing immediate navigation to dashboard");
-      setIsLoading(false);
+      // STEP 5: Show success message
+      toast({
+        title: "Login successful",
+        description: "Welcome back to MeetingMaster!",
+      });
       
-      // Use timeout to ensure state updates are processed before navigation
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 100);
+      // STEP 6: HARDCODED NAVIGATION USING MULTIPLE METHODS
+      console.log("FORCING NAVIGATION TO DASHBOARD USING MULTIPLE METHODS");
       
-      // Step 5: Add extra fallback for navigation
+      // Method 1: React Router navigate
+      navigate('/dashboard', { replace: true });
+      console.log("Navigation method 1 executed");
+      
+      // Method 2: Direct window location change (with delay)
       setTimeout(() => {
-        const currentPath = window.location.pathname;
-        if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
-          console.log("Still on login page after timeout, forcing navigation");
-          window.location.href = '/dashboard';
-        }
-      }, 2000);
+        console.log("Executing navigation method 2");
+        window.location.href = '/dashboard';
+      }, 500);
+      
+      // Method 3: Final fallback (with longer delay)
+      setTimeout(() => {
+        console.log("Executing navigation method 3");
+        window.location.replace('/dashboard');
+      }, 1500);
+      
+      // Clear loading state
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 200);
       
       return { data };
     } catch (error) {

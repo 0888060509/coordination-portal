@@ -26,7 +26,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const LoginPage = () => {
-  const { login, loginWithGoogle, isAuthenticated, isLoading: authLoading, session } = useAuth();
+  const { login, loginWithGoogle, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,26 +34,51 @@ const LoginPage = () => {
   const [processingOAuth, setProcessingOAuth] = useState(false);
   const [initialAuthCheck, setInitialAuthCheck] = useState(true);
   const [loginAttempts, setLoginAttempts] = useState(0);
-  const navigationAttempted = useRef(false);
-  const authCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  
+  const navigationAttemptedRef = useRef(false);
+  const authCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const loginTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const redirectCountdownRef = useRef<NodeJS.Timeout[]>([]);
+  
+  // Check localStorage on page load for authentication success
+  useEffect(() => {
+    const authSuccess = localStorage.getItem('auth_success');
+    const authTimestamp = localStorage.getItem('auth_timestamp');
+    
+    // If auth success is recorded within the last 5 minutes, redirect
+    if (authSuccess === 'true' && authTimestamp) {
+      const timestamp = parseInt(authTimestamp, 10);
+      const now = Date.now();
+      const fiveMinutesMs = 5 * 60 * 1000;
+      
+      if (now - timestamp < fiveMinutesMs) {
+        console.log("Found recent auth success in localStorage, redirecting");
+        navigate('/dashboard', { replace: true });
+        
+        // Clean up after redirect
+        setTimeout(() => {
+          localStorage.removeItem('auth_success');
+          localStorage.removeItem('auth_timestamp');
+        }, 1000);
+      } else {
+        // Clear stale auth success
+        localStorage.removeItem('auth_success');
+        localStorage.removeItem('auth_timestamp');
+      }
+    }
+  }, [navigate]);
 
-  const from = location.state?.from?.pathname || "/dashboard";
-
-  const forceNavigateToDashboard = () => {
-    console.log("Forcing navigation to dashboard");
-    navigationAttempted.current = true;
-    navigate('/dashboard', { replace: true });
-  };
-
+  // Clean up all intervals and timeouts on unmount
   useEffect(() => {
     return () => {
-      if (authCheckInterval.current) clearInterval(authCheckInterval.current);
+      if (authCheckIntervalRef.current) clearInterval(authCheckIntervalRef.current);
       if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
+      redirectCountdownRef.current.forEach(timeout => clearTimeout(timeout));
       setIsSubmitting(false);
     };
   }, []);
 
+  // Initial auth check delay
   useEffect(() => {
     const timer = setTimeout(() => {
       setInitialAuthCheck(false);
@@ -62,16 +87,17 @@ const LoginPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Continuous session check
   useEffect(() => {
-    if (!navigationAttempted.current && !processingOAuth) {
-      authCheckInterval.current = setInterval(async () => {
+    if (!navigationAttemptedRef.current) {
+      authCheckIntervalRef.current = setInterval(async () => {
         try {
           console.log("Performing direct session check");
           const { data } = await supabase.auth.getSession();
           
           if (data.session) {
-            console.log("Session found in direct check, navigating to dashboard");
-            clearInterval(authCheckInterval.current!);
+            console.log("Session found in direct check, navigating");
+            clearInterval(authCheckIntervalRef.current!);
             forceNavigateToDashboard();
           }
         } catch (error) {
@@ -81,101 +107,32 @@ const LoginPage = () => {
     }
 
     return () => {
-      if (authCheckInterval.current) {
-        clearInterval(authCheckInterval.current);
+      if (authCheckIntervalRef.current) {
+        clearInterval(authCheckIntervalRef.current);
       }
     };
-  }, [navigate]);
+  }, []);
 
+  // Detect authentication state changes
   useEffect(() => {
-    if (isAuthenticated && !processingOAuth && !navigationAttempted.current) {
-      console.log("User authenticated, navigating to dashboard");
+    if (isAuthenticated && !processingOAuth && !navigationAttemptedRef.current) {
+      console.log("User authenticated, navigating");
       forceNavigateToDashboard();
     }
-  }, [isAuthenticated, processingOAuth, navigate]);
+  }, [isAuthenticated, processingOAuth]);
 
-  useEffect(() => {
-    if (isSubmitting && !authLoading) {
-      console.log("Login attempt in progress, setting progressive timeouts");
-
-      if (loginTimeoutRef.current) {
-        clearTimeout(loginTimeoutRef.current);
-      }
-
-      loginTimeoutRef.current = setTimeout(async () => {
-        try {
-          console.log("First timeout check - 5s after login attempt");
-          const { data } = await supabase.auth.getSession();
-          
-          if (data.session) {
-            console.log("Session found in first timeout check, navigating");
-            toast({
-              title: "Login successful",
-              description: "You are now logged in.",
-            });
-            setIsSubmitting(false);
-            forceNavigateToDashboard();
-            return;
-          }
-          
-          loginTimeoutRef.current = setTimeout(async () => {
-            try {
-              console.log("Second timeout check - 10s after login attempt");
-              const { data } = await supabase.auth.getSession();
-              
-              if (data.session) {
-                console.log("Session found in second timeout check, navigating");
-                toast({
-                  title: "Login successful",
-                  description: "You are now logged in.",
-                });
-                setIsSubmitting(false);
-                forceNavigateToDashboard();
-                return;
-              }
-              
-              loginTimeoutRef.current = setTimeout(() => {
-                console.log("Final timeout - login attempt timed out after 15s");
-                setIsSubmitting(false);
-                setAuthError("Login attempt timed out. Please try again.");
-                
-                toast({
-                  variant: "destructive",
-                  title: "Login timeout",
-                  description: "Your login request took too long. Please try again.",
-                });
-              }, 5000);
-            } catch (error) {
-              console.error("Error in second timeout check:", error);
-              setIsSubmitting(false);
-              setAuthError("Login verification failed. Please try again.");
-            }
-          }, 5000);
-        } catch (error) {
-          console.error("Error in first timeout check:", error);
-          setIsSubmitting(false);
-          setAuthError("Login verification failed. Please try again.");
-        }
-      }, 5000);
-    }
-
-    return () => {
-      if (loginTimeoutRef.current) {
-        clearTimeout(loginTimeoutRef.current);
-      }
-    };
-  }, [isSubmitting, authLoading, navigate]);
-
+  // Handle OAuth redirects
   useEffect(() => {
     if (location.hash) {
-      console.log("LoginPage detected hash in URL:", location.hash.substring(0, 30) + "...");
+      console.log("Detected hash in URL:", location.hash.substring(0, 30) + "...");
       
       const processAuth = async () => {
         try {
           setProcessingOAuth(true);
           setAuthError(null);
-          console.log("LoginPage processing OAuth hash");
+          console.log("Processing OAuth hash");
           
+          // Clear hash from URL
           if (window.history && window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           }
@@ -183,44 +140,45 @@ const LoginPage = () => {
           const session = await processAuthHash();
           
           if (session) {
-            console.log("OAuth processing successful in LoginPage");
+            console.log("OAuth processing successful");
             toast({
               title: "Successfully signed in",
               description: "Welcome to MeetingMaster!",
             });
             
-            setTimeout(() => {
-              console.log("LoginPage forcing navigation to dashboard after OAuth");
-              setProcessingOAuth(false);
-              navigate('/dashboard', { replace: true });
-            }, 1000);
+            // Set success indicator
+            localStorage.setItem('auth_success', 'true');
+            localStorage.setItem('auth_timestamp', Date.now().toString());
+            
+            // Immediate navigation
+            forceNavigateToDashboard();
           } else {
-            console.error("Failed to process OAuth hash in LoginPage");
+            console.error("Failed to process OAuth hash");
             setProcessingOAuth(false);
             setAuthError("Failed to complete authentication. Please try again.");
             
             toast({
               variant: "destructive",
               title: "Authentication failed",
-              description: "Could not complete the Google sign-in process. Please try again.",
+              description: "Could not complete the sign-in process. Please try again.",
             });
           }
         } catch (error) {
-          console.error("Error processing OAuth in LoginPage:", error);
+          console.error("Error processing OAuth:", error);
           setAuthError("Failed to complete authentication. Please try again.");
           setProcessingOAuth(false);
           
           toast({
             variant: "destructive",
             title: "Authentication error",
-            description: "An unexpected error occurred during Google sign-in.",
+            description: "An unexpected error occurred during sign-in.",
           });
         }
       };
 
       processAuth();
     }
-  }, [location.hash, navigate]);
+  }, [location.hash]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -230,13 +188,42 @@ const LoginPage = () => {
     },
   });
 
+  const forceNavigateToDashboard = () => {
+    console.log("Forcing navigation to dashboard with multiple methods");
+    navigationAttemptedRef.current = true;
+    
+    // Method 1: React Router
+    navigate('/dashboard', { replace: true });
+    
+    // Add multiple fallback methods with increasing delays
+    const timeouts = [
+      setTimeout(() => {
+        console.log("Navigation fallback 1");
+        window.location.href = '/dashboard';
+      }, 500),
+      
+      setTimeout(() => {
+        console.log("Navigation fallback 2");
+        window.location.replace('/dashboard');
+      }, 1000),
+      
+      setTimeout(() => {
+        console.log("Navigation fallback 3 - final attempt");
+        window.location.href = `${window.location.origin}/dashboard`;
+      }, 2000)
+    ];
+    
+    // Store timeouts for cleanup
+    redirectCountdownRef.current = timeouts;
+  };
+
   const onSubmit = async (data: FormValues) => {
     if (isSubmitting) return;
     
     setIsSubmitting(true);
     setAuthError(null);
     setLoginAttempts(prev => prev + 1);
-    navigationAttempted.current = false;
+    navigationAttemptedRef.current = false;
     
     try {
       console.log("Attempting login with email:", data.email);
@@ -246,23 +233,25 @@ const LoginPage = () => {
         throw result.error;
       }
       
+      // Login has its own navigation handling, but add an extra verification
       setTimeout(async () => {
-        try {
-          console.log("Performing immediate session check after login");
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData.session) {
-            console.log("Session verified after login, forcing navigation");
-            forceNavigateToDashboard();
-          }
-        } catch (err) {
-          console.error("Error in post-login session check:", err);
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          console.log("Session verified after login");
+          // No need to navigate here as it's handled in login
+          
+          // Check if we're still on the login page after 2 seconds
+          setTimeout(() => {
+            if (window.location.pathname.includes('login')) {
+              console.log("Still on login page after successful login, forcing redirect");
+              window.location.href = '/dashboard';
+            }
+          }, 2000);
         }
-      }, 500);
+      }, 1000);
       
-      console.log("Login successful, waiting for redirect");
     } catch (error) {
       console.error("Login failed:", error);
-      
       setIsSubmitting(false);
       
       setAuthError(
@@ -286,7 +275,7 @@ const LoginPage = () => {
 
     setAuthError(null);
     try {
-      console.log("Initiating Google login from LoginPage");
+      console.log("Initiating Google login");
       
       toast({
         title: "Redirecting to Google",
@@ -295,7 +284,7 @@ const LoginPage = () => {
       
       await loginWithGoogle();
     } catch (error) {
-      console.error("Google login failed in LoginPage:", error);
+      console.error("Google login failed:", error);
       setAuthError("Google login failed. Please try again.");
     }
   };
@@ -303,9 +292,13 @@ const LoginPage = () => {
   const handleResetSubmission = () => {
     setIsSubmitting(false);
     setAuthError("Login attempt was reset. Please try again.");
+    
     if (loginTimeoutRef.current) {
       clearTimeout(loginTimeoutRef.current);
     }
+    
+    redirectCountdownRef.current.forEach(timeout => clearTimeout(timeout));
+    redirectCountdownRef.current = [];
   };
 
   const handleForceLogin = async () => {
@@ -318,14 +311,18 @@ const LoginPage = () => {
       const { data } = await supabase.auth.refreshSession();
       
       if (data.session) {
-        console.log("Session refreshed successfully, forcing navigation");
+        console.log("Session refreshed successfully");
+        
+        // Set success indicator
+        localStorage.setItem('auth_success', 'true');
+        localStorage.setItem('auth_timestamp', Date.now().toString());
+        
         toast({
           title: "Session refreshed",
           description: "You have been signed in successfully.",
         });
-        setTimeout(() => {
-          forceNavigateToDashboard();
-        }, 500);
+        
+        forceNavigateToDashboard();
         return;
       }
       
@@ -336,6 +333,11 @@ const LoginPage = () => {
       setIsSubmitting(false);
       setAuthError("Force login failed. Please try logging in normally.");
     }
+  };
+
+  const handleDirectNavigation = () => {
+    console.log("Attempting direct navigation to dashboard");
+    window.location.href = '/dashboard';
   };
 
   const showLoadingState = (authLoading && initialAuthCheck) || processingOAuth;
@@ -364,13 +366,22 @@ const LoginPage = () => {
             <p className="text-sm text-gray-500 mb-2">
               Having trouble signing in?
             </p>
-            <Button 
-              variant="outline" 
-              className="mt-2 w-full" 
-              onClick={handleForceLogin}
-            >
-              Force Session Refresh
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleForceLogin}
+              >
+                Force Session Refresh
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleDirectNavigation}
+              >
+                Go Directly to Dashboard
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -613,4 +624,3 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
-
