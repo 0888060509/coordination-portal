@@ -2,101 +2,82 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, XCircle, Calendar as CalendarIcon, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, addDays, isSameDay, parseISO, startOfWeek, startOfDay, endOfDay, endOfWeek, subWeeks, addWeeks, eachDayOfInterval, addHours } from 'date-fns';
-import { BookingWithDetails } from '@/types/booking';
-import { useQuery } from '@tanstack/react-query';
-import BookingModal from '../bookings/BookingModal';
-import { getRoomAvailability } from '@/services/roomService';
-import { getRoomBookings } from '@/services/bookingService';
-import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { format, parseISO, startOfDay, addDays, isToday, isSameDay } from 'date-fns';
+import { getRoomAvailability } from '@/services/roomService';
 import { AvailabilityCheckResult } from '@/types/room.service';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import AvailabilityIndicator from './AvailabilityIndicator';
 
 interface RoomAvailabilityCalendarProps {
   roomId: string;
-  onDateSelect?: (date: Date) => void;
 }
 
-// Business hours
-const BUSINESS_START_HOUR = 8; // 8 AM
-const BUSINESS_END_HOUR = 18; // 6 PM
-
-const RoomAvailabilityCalendar = ({
-  roomId,
-  onDateSelect
-}: RoomAvailabilityCalendarProps) => {
+const RoomAvailabilityCalendar: React.FC<RoomAvailabilityCalendarProps> = ({ roomId }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [view, setView] = useState<'day' | 'week'>('day');
-  const [weekStartDate, setWeekStartDate] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [availabilityData, setAvailabilityData] = useState<AvailabilityCheckResult | null>(null);
+  const [timeSlots, setTimeSlots] = useState<{ time: string; available: boolean }[]>([]);
 
-  // Calculate the start and end dates for the current view
-  const startDate = view === 'day' 
-    ? startOfDay(selectedDate) 
-    : startOfDay(weekStartDate);
-  
-  const endDate = view === 'day' 
-    ? endOfDay(selectedDate) 
-    : endOfDay(endOfWeek(weekStartDate, { weekStartsOn: 1 }));
+  // Load availability data for the selected date
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      setIsLoading(true);
+      try {
+        const startDate = startOfDay(selectedDate);
+        const endDate = view === 'day' ? addDays(startDate, 1) : addDays(startDate, 7);
+        
+        const data = await getRoomAvailability(roomId, startDate, endDate);
+        setAvailabilityData(data);
+        
+        // Generate time slots from 8 AM to 6 PM
+        generateTimeSlots(data);
+      } catch (error) {
+        console.error('Error fetching room availability:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchAvailability();
+  }, [roomId, selectedDate, view]);
 
-  // Fetch availability data
-  const { data: availabilityData, isLoading, error } = useQuery({
-    queryKey: ['roomAvailability', roomId, startDate.toISOString(), endDate.toISOString()],
-    queryFn: () => getRoomAvailability(roomId, startDate, endDate),
-  });
+  // Generate time slots for the selected date
+  const generateTimeSlots = (availabilityData: AvailabilityCheckResult | null) => {
+    if (!availabilityData) return;
 
-  // Handle date selection
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      setSelectedDate(date);
-      if (onDateSelect) {
-        onDateSelect(date);
+    const slots: { time: string; available: boolean }[] = [];
+    const startHour = 8; // 8 AM
+    const endHour = 18; // 6 PM
+    const interval = 30; // 30 minutes
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += interval) {
+        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const slotAvailable = isTimeSlotAvailable(hour, minute, availabilityData);
+        slots.push({ time: timeStr, available: slotAvailable });
       }
     }
+    
+    setTimeSlots(slots);
   };
 
-  // Navigate to previous/next week
-  const goToPreviousWeek = () => {
-    setWeekStartDate(prev => subWeeks(prev, 1));
-  };
-
-  const goToNextWeek = () => {
-    setWeekStartDate(prev => addWeeks(prev, 1));
-  };
-
-  // Generate time slots for the day view
-  const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = BUSINESS_START_HOUR; hour <= BUSINESS_END_HOUR; hour++) {
-      const date = new Date(selectedDate);
-      date.setHours(hour, 0, 0, 0);
-      slots.push(date);
+  // Check if a specific time slot is available
+  const isTimeSlotAvailable = (hour: number, minute: number, availabilityData: AvailabilityCheckResult): boolean => {
+    if (!availabilityData.is_available || !availabilityData.conflicting_bookings) {
+      return availabilityData.is_available;
     }
-    return slots;
-  };
-
-  // Generate days for the week view
-  const generateWeekDays = () => {
-    return eachDayOfInterval({
-      start: weekStartDate,
-      end: endOfWeek(weekStartDate, { weekStartsOn: 1 })
-    });
-  };
-
-  // Check if a time slot is available
-  const isTimeSlotAvailable = (date: Date) => {
-    if (!availabilityData || !availabilityData.conflicting_bookings) return true;
     
-    // Convert the date to a timestamp for comparison
-    const slotStart = date.getTime();
-    const slotEnd = addHours(date, 1).getTime();
+    // Create date objects for the slot start and end
+    const slotStart = new Date(selectedDate);
+    slotStart.setHours(hour, minute, 0, 0);
     
-    // Check if there are any overlapping bookings
+    const slotEnd = new Date(slotStart);
+    slotEnd.setMinutes(slotEnd.getMinutes() + 30);
+    
+    // Check against each conflicting booking
     return !availabilityData.conflicting_bookings.some(booking => {
       const bookingStart = typeof booking.start_time === 'string' 
         ? parseISO(booking.start_time).getTime()
@@ -109,182 +90,135 @@ const RoomAvailabilityCalendar = ({
       return (
         (slotStart >= bookingStart && slotStart < bookingEnd) || // Slot starts during booking
         (slotEnd > bookingStart && slotEnd <= bookingEnd) || // Slot ends during booking
-        (slotStart <= bookingStart && slotEnd >= bookingEnd) // Booking is within slot
+        (slotStart <= bookingStart && slotEnd >= bookingEnd) // Slot contains booking
       );
     });
   };
 
+  // Calculate the date display string based on the view
+  const getDateDisplayString = () => {
+    if (view === 'day') {
+      return format(selectedDate, 'MMMM d, yyyy');
+    } else {
+      const endDate = addDays(selectedDate, 6);
+      return `${format(selectedDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+    }
+  };
+
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(date);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-        <h2 className="text-xl font-semibold">Room Availability</h2>
-        <Tabs value={view} onValueChange={(v) => setView(v as 'day' | 'week')}>
-          <TabsList>
-            <TabsTrigger value="day">Day</TabsTrigger>
-            <TabsTrigger value="week">Week</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Calendar for date selection */}
-        <div className="md:w-auto">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={handleDateSelect}
-            className="rounded-md border pointer-events-auto"
-          />
-        </div>
-
-        {/* Availability display */}
-        <div className="flex-1">
-          <Tabs value={view}>
-            <TabsContent value="day" className="mt-0">
-              <div className="rounded-md border">
-                <div className="bg-muted p-3 text-center font-medium">
-                  {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-                </div>
-                <div className="p-4">
+    <Card>
+      <CardHeader>
+        <CardTitle>Room Availability</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="day" onValueChange={(value) => setView(value as 'day' | 'week')}>
+          <div className="flex justify-between items-center mb-4">
+            <TabsList>
+              <TabsTrigger value="day">Day</TabsTrigger>
+              <TabsTrigger value="week">Week</TabsTrigger>
+            </TabsList>
+            <span className="text-sm font-medium">{getDateDisplayString()}</span>
+          </div>
+          
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+            <div>
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && handleDayClick(date)}
+                className="border rounded-md"
+                disabled={date => date < startOfDay(new Date())}
+                modifiersClassNames={{
+                  today: "bg-primary text-primary-foreground",
+                  selected: "bg-primary text-primary-foreground",
+                }}
+              />
+              
+              <div className="mt-4">
+                <h3 className="font-medium mb-2">Today's Status</h3>
+                {isLoading ? <LoadingSpinner /> : (
+                  <AvailabilityIndicator 
+                    roomId={roomId} 
+                    date={isToday(selectedDate) ? selectedDate : new Date()} 
+                  />
+                )}
+              </div>
+            </div>
+            
+            <div className="lg:col-span-2">
+              <TabsContent value="day" className="mt-0">
+                <div className="space-y-2">
+                  <h3 className="font-medium">Time Slots</h3>
                   {isLoading ? (
-                    <div className="flex justify-center p-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      <span className="ml-2">Loading availability...</span>
+                    <div className="flex justify-center py-8">
+                      <LoadingSpinner />
                     </div>
-                  ) : error ? (
-                    <div className="flex flex-col items-center text-center p-8 text-red-500">
-                      <AlertCircle className="h-8 w-8 mb-2" />
-                      <p>Error loading availability data</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4">
+                      {timeSlots.map((slot, index) => (
+                        <div 
+                          key={index}
+                          className={`p-2 text-center rounded border ${
+                            slot.available 
+                              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-900'
+                              : 'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-900'
+                          }`}
+                        >
+                          <span className="text-sm">{slot.time}</span>
+                          <Badge 
+                            variant={slot.available ? "outline" : "destructive"}
+                            className="text-xs w-full mt-1"
+                          >
+                            {slot.available ? 'Available' : 'Booked'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="week" className="mt-0">
+                <div className="space-y-4">
+                  {/* We could implement a week view here with a daily summary */}
+                  <h3 className="font-medium">Week Overview</h3>
+                  {isLoading ? (
+                    <div className="flex justify-center py-8">
+                      <LoadingSpinner />
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {generateTimeSlots().map((timeSlot, index) => {
-                        const isAvailable = isTimeSlotAvailable(timeSlot);
+                      {[0, 1, 2, 3, 4, 5, 6].map((dayOffset) => {
+                        const date = addDays(selectedDate, dayOffset);
                         return (
-                          <div 
-                            key={index}
-                            className={cn(
-                              "flex items-center p-3 rounded-md",
-                              isAvailable 
-                                ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900" 
-                                : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900"
+                          <div key={dayOffset} className="flex items-center p-2 border rounded">
+                            <div className="flex-1">
+                              <div className="font-medium">{format(date, 'EEEE')}</div>
+                              <div className="text-sm text-muted-foreground">{format(date, 'MMM d')}</div>
+                            </div>
+                            {isSameDay(date, selectedDate) && availabilityData ? (
+                              <Badge variant={availabilityData.is_available ? "outline" : "destructive"}>
+                                {availabilityData.is_available ? 'Available' : 'Partially Booked'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">Select to view</Badge>
                             )}
-                          >
-                            <Clock className={cn(
-                              "h-5 w-5 mr-3",
-                              isAvailable ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                            )} />
-                            <span className="font-medium">
-                              {format(timeSlot, 'h:mm a')} - {format(addHours(timeSlot, 1), 'h:mm a')}
-                            </span>
-                            <span className={cn(
-                              "ml-auto text-sm font-medium",
-                              isAvailable ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                            )}>
-                              {isAvailable ? 'Available' : 'Booked'}
-                            </span>
                           </div>
                         );
                       })}
                     </div>
                   )}
                 </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="week" className="mt-0">
-              <div className="rounded-md border">
-                <div className="bg-muted p-3 flex justify-between items-center">
-                  <Button variant="ghost" size="sm" onClick={goToPreviousWeek}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="font-medium">
-                    {format(weekStartDate, 'MMM d')} - {format(endOfWeek(weekStartDate, { weekStartsOn: 1 }), 'MMM d, yyyy')}
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={goToNextWeek}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {isLoading ? (
-                  <div className="flex justify-center p-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <span className="ml-2">Loading availability...</span>
-                  </div>
-                ) : error ? (
-                  <div className="flex flex-col items-center text-center p-8 text-red-500">
-                    <AlertCircle className="h-8 w-8 mb-2" />
-                    <p>Error loading availability data</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-7 text-center">
-                    {generateWeekDays().map((day, index) => (
-                      <div key={index} className="p-2 font-medium border-b">
-                        <div>{format(day, 'EEE')}</div>
-                        <div className="text-sm">{format(day, 'd')}</div>
-                      </div>
-                    ))}
-                    
-                    {generateWeekDays().map((day, dayIndex) => {
-                      const morningDate = new Date(day);
-                      morningDate.setHours(9, 0, 0, 0);
-                      
-                      const afternoonDate = new Date(day);
-                      afternoonDate.setHours(13, 0, 0, 0);
-                      
-                      const eveningDate = new Date(day);
-                      eveningDate.setHours(17, 0, 0, 0);
-                      
-                      const dayAvailability = {
-                        morning: isTimeSlotAvailable(morningDate),
-                        afternoon: isTimeSlotAvailable(afternoonDate),
-                        evening: isTimeSlotAvailable(eveningDate)
-                      };
-                      
-                      return (
-                        <div 
-                          key={dayIndex} 
-                          className={cn(
-                            "p-2 h-24 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/20",
-                            isSameDay(day, selectedDate) && "bg-blue-50 dark:bg-blue-900/20"
-                          )}
-                          onClick={() => handleDateSelect(day)}
-                        >
-                          <div className={cn(
-                            "text-xs mb-1 p-1 rounded-sm",
-                            dayAvailability.morning 
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
-                              : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                          )}>
-                            AM: {dayAvailability.morning ? 'Free' : 'Busy'}
-                          </div>
-                          <div className={cn(
-                            "text-xs mb-1 p-1 rounded-sm",
-                            dayAvailability.afternoon 
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
-                              : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                          )}>
-                            PM: {dayAvailability.afternoon ? 'Free' : 'Busy'}
-                          </div>
-                          <div className={cn(
-                            "text-xs p-1 rounded-sm",
-                            dayAvailability.evening 
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
-                              : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                          )}>
-                            EVE: {dayAvailability.evening ? 'Free' : 'Busy'}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    </div>
+              </TabsContent>
+            </div>
+          </div>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 };
 

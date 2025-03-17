@@ -1,71 +1,88 @@
 
 import React, { useState, useEffect } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { getRoomAvailability } from '@/services/roomService';
 import { AvailabilityCheckResult } from '@/types/room.service';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface AvailabilityIndicatorProps {
   roomId: string;
-  startDate: Date;
-  endDate: Date;
+  date: Date;
+  startTime?: string;
+  endTime?: string;
 }
 
 const AvailabilityIndicator: React.FC<AvailabilityIndicatorProps> = ({
   roomId,
-  startDate,
-  endDate,
+  date,
+  startTime = '08:00',
+  endTime = '18:00'
 }) => {
-  const [availability, setAvailability] = useState<AvailabilityCheckResult>({ 
-    is_available: false,
-    conflicting_bookings: [] 
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [availability, setAvailability] = useState<{ available: boolean; conflictingBookings?: any[] }>({
+    available: false
   });
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!roomId) return;
+
     const checkAvailability = async () => {
       setIsLoading(true);
       try {
-        const result = await getRoomAvailability(roomId, startDate, endDate);
-        setAvailability(result);
+        // Create date objects for the start and end of the day
+        const start = new Date(date);
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        start.setHours(startHours, startMinutes, 0, 0);
+        
+        const end = new Date(date);
+        const [endHours, endMinutes] = endTime.split(':').map(Number);
+        end.setHours(endHours, endMinutes, 0, 0);
+        
+        // Get availability for the specified time range
+        const availabilityData: AvailabilityCheckResult = await getRoomAvailability(roomId, start, end);
+        
+        setAvailability({
+          available: availabilityData.is_available,
+          conflictingBookings: availabilityData.conflicting_bookings
+        });
       } catch (error) {
         console.error('Error checking room availability:', error);
-        setAvailability({ is_available: false, conflicting_bookings: [] });
+        setAvailability({ available: false });
       } finally {
         setIsLoading(false);
       }
     };
 
     checkAvailability();
-  }, [roomId, startDate, endDate]);
+  }, [roomId, date, startTime, endTime]);
 
   if (isLoading) {
-    return <Badge variant="secondary">Checking...</Badge>;
+    return <LoadingSpinner size="sm" />;
   }
 
-  if (availability.is_available) {
-    return (
-      <Badge className="bg-green-500">
-        <CheckCircle className="mr-2 h-4 w-4" />
-        Available
-      </Badge>
-    );
-  } else {
-    const startTime = availability.conflicting_bookings && availability.conflicting_bookings.length > 0
-      ? format(new Date(availability.conflicting_bookings[0].start_time), 'h:mm a')
-      : 'N/A';
-    const endTime = availability.conflicting_bookings && availability.conflicting_bookings.length > 0
-      ? format(new Date(availability.conflicting_bookings[0].end_time), 'h:mm a')
-      : 'N/A';
-
-    return (
-      <Badge variant="destructive">
-        <XCircle className="mr-2 h-4 w-4" />
-        Booked {startTime} - {endTime}
-      </Badge>
-    );
-  }
+  return (
+    <div className="flex items-center">
+      {availability.available ? (
+        <>
+          <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+          <span>Available</span>
+        </>
+      ) : (
+        <>
+          <XCircle className="h-5 w-5 text-red-500 mr-2" />
+          <span>
+            {availability.conflictingBookings && availability.conflictingBookings.length > 0 
+              ? `Booked (${availability.conflictingBookings.length} ${
+                  availability.conflictingBookings.length === 1 ? 'booking' : 'bookings'
+                })`
+              : 'Unavailable'
+            }
+          </span>
+        </>
+      )}
+    </div>
+  );
 };
 
 export default AvailabilityIndicator;
