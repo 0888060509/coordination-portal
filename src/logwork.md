@@ -56,3 +56,7 @@
 - Added getTimeSlots function to dateUtils.ts for time selection in booking form
 - Ensured consistency between types in booking.ts and index.ts
 
+## 2023-08-20
+- Added getWeekDays and isSameDay functions to dateUtils.ts
+- Enhanced date utility functions to support BookingCalendar component
+- Fixed TypeScript errors in the booking components

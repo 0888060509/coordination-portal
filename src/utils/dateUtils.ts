@@ -50,3 +50,39 @@ export const getTimeSlots = (
   return slots;
 };
 
+/**
+ * Returns an array containing all days of the week for the week that contains the provided date
+ * @param date The date to get the week for
+ * @returns Array of Date objects representing each day of the week
+ */
+export const getWeekDays = (date: Date): Date[] => {
+  const days: Date[] = [];
+  const day = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  
+  // Calculate the start of the week (Sunday)
+  const startOfWeek = new Date(date);
+  startOfWeek.setDate(date.getDate() - day);
+  
+  // Add all days of the week
+  for (let i = 0; i < 7; i++) {
+    const weekDay = new Date(startOfWeek);
+    weekDay.setDate(startOfWeek.getDate() + i);
+    days.push(weekDay);
+  }
+  
+  return days;
+};
+
+/**
+ * Check if two dates are on the same day
+ * @param dateA First date
+ * @param dateB Second date
+ * @returns True if both dates are on the same day
+ */
+export const isSameDay = (dateA: Date, dateB: Date): boolean => {
+  return (
+    dateA.getFullYear() === dateB.getFullYear() &&
+    dateA.getMonth() === dateB.getMonth() &&
+    dateA.getDate() === dateB.getDate()
+  );
+};
