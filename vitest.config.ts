@@ -10,5 +10,3 @@ export default defineConfig({
     setupFiles: ['./src/setupTests.ts'],
   },
 });
-</lov-add-dependency>jest-dom@latest</lov-add-dependency>
-<lov-add-dependency>@testing-library/jest-dom@^6.1.5</lov-add-dependency>
