@@ -78,3 +78,30 @@
 3. Add error handling to show user-friendly messages when database queries fail
 4. Create a small utility function to handle manual joins if this pattern is used elsewhere
 
+## 2025-03-19: Added Sample Data for Rooms and Amenities
+
+### Changes Made:
+1. Added 10 sample amenities with names and icons:
+   - Projector, Whiteboard, Video Conferencing, Sound System, etc.
+   - Each amenity includes a descriptive name and appropriate icon
+
+2. Added 10 sample meeting rooms with complete details:
+   - Various sizes (4-30 person capacity)
+   - Different locations (Main Building, Tech Wing, etc.)
+   - Detailed descriptions and realistic image URLs 
+   - Diverse room types (Executive Suite, Huddle Space, Training Room, etc.)
+
+3. Created room-amenity relationships:
+   - Each room has 2-6 appropriate amenities assigned
+   - Relationships are created based on room type and function
+
+### Testing:
+- Verified rooms appear correctly on the rooms listing page
+- Confirmed amenities are properly associated with each room
+- Validated that room filtering by amenities works as expected
+
+### Next Steps:
+1. Consider adding sample booking data once user authentication is set up
+2. Add more diverse room images for better visual appeal
+3. Implement room usage statistics based on booking data
+4. Consider adding floor plan visualization for room locations
