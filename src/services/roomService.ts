@@ -33,6 +33,12 @@ export const roomService = {
       if (filters?.status) {
         query = query.eq("status", filters.status);
       }
+      
+      // Apply amenity filters if provided
+      if (filters?.amenities && filters.amenities.length > 0) {
+        // We'll handle amenity filtering after we get the results
+        // since supabase's nested arrays are challenging to filter
+      }
 
       // Fetch rooms
       const { data: rooms, error } = await query;
@@ -42,7 +48,7 @@ export const roomService = {
       }
 
       // Transform data to match our RoomWithAmenities type
-      const transformedRooms: RoomWithAmenities[] = rooms.map((room) => {
+      let transformedRooms: RoomWithAmenities[] = rooms.map((room) => {
         const amenities = room.room_amenities.map(
           (ra: any) => ra.amenities
         );
@@ -65,6 +71,16 @@ export const roomService = {
 
         return transformedRoom;
       });
+      
+      // Manual filtering for amenities
+      if (filters?.amenities && filters.amenities.length > 0) {
+        transformedRooms = transformedRooms.filter(room => {
+          // Check if the room has all the requested amenities
+          return filters.amenities!.every(amenityId => 
+            room.amenities.some(amenity => amenity.id === amenityId)
+          );
+        });
+      }
 
       // If date and time filters are provided, check availability
       if (
@@ -231,6 +247,34 @@ export const roomService = {
         variant: "destructive",
         title: "Error loading amenities",
         description: "Could not load amenities data. Please try again later.",
+      });
+      return [];
+    }
+  },
+
+  // Get room amenities by room ID
+  async getRoomAmenities(roomId: string): Promise<Amenity[]> {
+    try {
+      const { data, error } = await supabase
+        .from("room_amenities")
+        .select(`
+          amenities(*)
+        `)
+        .eq("room_id", roomId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Extract amenities from the nested structure
+      const amenities = data.map(item => item.amenities);
+      return amenities || [];
+    } catch (error) {
+      console.error("Error fetching room amenities:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading amenities",
+        description: "Could not load room amenities. Please try again later.",
       });
       return [];
     }
