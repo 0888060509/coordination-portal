@@ -3,17 +3,14 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { forceToDashboard, forceToLogin, navigateTo } from '@/services/navigationService';
 
 /**
  * A simplified hook that handles authentication redirects
- * This now uses the centralized navigation service for reliability
+ * with improved reliability
  */
 export function useRedirectAuth() {
   const location = useLocation();
   const navigate = useNavigate();
-  const checkInterval = useRef<NodeJS.Timeout | null>(null);
-  const navigationTimeout = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
   
   // Set up isMounted ref for cleanup
@@ -40,7 +37,8 @@ export function useRedirectAuth() {
             // Store success in localStorage for other components
             localStorage.setItem('auth_success', 'true');
             localStorage.setItem('auth_timestamp', Date.now().toString());
-            navigate('/dashboard', { replace: true });
+            // Use window.location for most reliable navigation
+            window.location.href = '/dashboard';
           }
         } else {
           const currentPath = window.location.pathname;
@@ -48,33 +46,13 @@ export function useRedirectAuth() {
               currentPath !== '/' && !currentPath.includes('/reset-password') && 
               !currentPath.includes('/forgot-password')) {
             console.log("🔐 No active session in useRedirectAuth");
-            navigate('/login', { replace: true });
+            window.location.href = '/login';
           }
         }
       } catch (error) {
         console.error("Error checking session:", error);
       }
     };
-    
-    // Run initial session check
-    checkSession();
-    
-    // Set up interval for continuous session checks only if not on dashboard
-    if (location.pathname !== '/dashboard') {
-      checkInterval.current = setInterval(() => {
-        if (location.pathname !== '/dashboard') {
-          checkSession();
-        }
-      }, 5000); // Less frequent checks to avoid overwhelming the system
-    }
-    
-    // Set a hard timeout to stop checking after reasonable time
-    navigationTimeout.current = setTimeout(() => {
-      if (checkInterval.current) {
-        clearInterval(checkInterval.current);
-        checkInterval.current = null;
-      }
-    }, 30000); // Stop checking after 30 seconds
     
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -86,15 +64,13 @@ export function useRedirectAuth() {
         localStorage.setItem('auth_success', 'true');
         localStorage.setItem('auth_timestamp', Date.now().toString());
         
-        const currentPath = window.location.pathname;
-        if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
-          navigate('/dashboard', { replace: true });
-        }
-        
         toast({
           title: "Successfully signed in",
           description: "Welcome to MeetingMaster!",
         });
+        
+        // Use window.location for most reliable navigation
+        window.location.href = '/dashboard';
       }
       
       if (event === 'SIGNED_OUT') {
@@ -106,35 +82,26 @@ export function useRedirectAuth() {
           description: "You have been logged out successfully",
         });
         
-        navigate('/login', { replace: true });
+        window.location.href = '/login';
       }
     });
     
     // Cleanup
     return () => {
       isMountedRef.current = false;
-      
-      if (checkInterval.current) {
-        clearInterval(checkInterval.current);
-      }
-      
-      if (navigationTimeout.current) {
-        clearTimeout(navigationTimeout.current);
-      }
-      
       subscription.unsubscribe();
     };
-  }, [location.pathname, navigate]);
+  }, [location.pathname]);
   
   return {
     forceToDashboard: () => {
-      navigate('/dashboard', { replace: true });
+      window.location.href = '/dashboard';
     },
     forceToLogin: () => {
-      navigate('/login', { replace: true });
+      window.location.href = '/login';
     },
     navigateTo: (path: string) => {
-      navigate(path, { replace: false });
+      window.location.href = path;
     }
   };
 }

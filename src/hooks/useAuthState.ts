@@ -25,16 +25,17 @@ export const useAuthState = ({
   const navigate = useNavigate();
   const profileFetchInProgress = useRef<boolean>(false);
   const initialAuthCheckComplete = useRef<boolean>(false);
+  const navigationAttempted = useRef<boolean>(false);
+  const isMounted = useRef<boolean>(true);
 
   // Check if the user is already logged in and set up auth state change listener
   useEffect(() => {
-    // Create flag to track if this component is mounted
-    let isMounted = true;
-    const navigationAttempted = { value: false };
+    // Set mounted flag
+    isMounted.current = true;
     
     const checkAuth = async () => {
       try {
-        if (!isMounted) return;
+        if (!isMounted.current) return;
         if (initialAuthCheckComplete.current) {
           console.log("Initial auth check already completed, skipping duplicate");
           return;
@@ -42,63 +43,59 @@ export const useAuthState = ({
         
         console.log("Initial auth check starting");
         profileFetchInProgress.current = true;
-        if (isMounted) setIsLoading(true);
+        if (isMounted.current) setIsLoading(true);
         
         // Get current session
         const { data: { session } } = await supabase.auth.getSession();
-        if (isMounted) setSession(session);
+        if (isMounted.current) setSession(session);
         
         console.log("Initial session check:", session ? `Session found for ${session.user.id}` : "No session found");
         
         if (session?.user) {
-          const userData = await fetchProfile(session.user.id, session);
-          if (userData && isMounted) {
-            console.log("Initial profile loaded successfully");
-            setUser(userData);
-            setIsAdmin(userData.role === 'admin');
+          try {
+            const userData = await fetchProfile(session.user.id, session);
             
-            // Store login success in localStorage
-            localStorage.setItem('auth_success', 'true');
-            localStorage.setItem('auth_timestamp', Date.now().toString());
-            
-            // Force navigation for already logged in users
-            const currentPath = window.location.pathname;
-            if ((currentPath === '/login' || currentPath === '/register' || currentPath === '/') && !navigationAttempted.value) {
-              console.log("User already logged in, redirecting to dashboard");
-              navigationAttempted.value = true;
+            if (userData && isMounted.current) {
+              console.log("Initial profile loaded successfully");
+              setUser(userData);
+              setIsAdmin(userData.role === 'admin');
               
-              // React Router navigation
-              navigate('/dashboard', { replace: true });
+              // Store login success in localStorage
+              localStorage.setItem('auth_success', 'true');
+              localStorage.setItem('auth_timestamp', Date.now().toString());
               
-              // Fallback navigation with delay
-              setTimeout(() => {
-                if (window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/') {
-                  console.log("Still on auth page, forcing direct navigation");
-                  window.location.href = '/dashboard';
-                }
-              }, 500);
+              // Force navigation for already logged in users
+              const currentPath = window.location.pathname;
+              if ((currentPath === '/login' || currentPath === '/register' || currentPath === '/') && !navigationAttempted.current) {
+                console.log("User already logged in, redirecting to dashboard");
+                navigationAttempted.current = true;
+                navigate('/dashboard', { replace: true });
+              }
+            } else if (isMounted.current) {
+              console.warn("Initial profile fetch failed");
+              setUser(null);
+              setIsAdmin(false);
             }
-          } else if (isMounted) {
-            console.warn("Initial profile fetch failed");
-            setUser(null);
-            setIsAdmin(false);
+          } catch (error) {
+            console.error("Failed to fetch profile:", error);
+            if (isMounted.current) {
+              setUser(null);
+              setIsAdmin(false);
+            }
           }
-        } else if (isMounted) {
+        } else if (isMounted.current) {
           console.log("No initial session found");
           setUser(null);
           setIsAdmin(false);
         }
-        
-        if (isMounted) {
-          setIsLoading(false);
-          if (setAuthInitialized) setAuthInitialized(true);
-        }
-        
-        initialAuthCheckComplete.current = true;
-        profileFetchInProgress.current = false;
       } catch (error) {
         console.error("Initial auth check error:", error);
-        if (isMounted) {
+        if (isMounted.current) {
+          setUser(null);
+          setIsAdmin(false);
+        }
+      } finally {
+        if (isMounted.current) {
           setIsLoading(false);
           if (setAuthInitialized) setAuthInitialized(true);
           profileFetchInProgress.current = false;
@@ -114,9 +111,9 @@ export const useAuthState = ({
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event, session ? `Session exists for ${session.user.id}` : "No session");
-        if (!isMounted) return;
+        if (!isMounted.current) return;
         
-        if (isMounted) setSession(session);
+        if (isMounted.current) setSession(session);
         
         if (event === 'SIGNED_IN' && session) {
           // Store login success in localStorage
@@ -125,7 +122,7 @@ export const useAuthState = ({
         }
         
         if (session?.user) {
-          if (isMounted) setIsLoading(true);
+          if (isMounted.current) setIsLoading(true);
           
           // Prevent duplicate fetches
           if (profileFetchInProgress.current) {
@@ -137,23 +134,23 @@ export const useAuthState = ({
           
           try {
             const userData = await fetchProfile(session.user.id, session);
-            if (userData && isMounted) {
+            if (userData && isMounted.current) {
               console.log("Profile loaded after auth state change");
               setUser(userData);
               setIsAdmin(userData.role === 'admin');
-            } else if (isMounted) {
+            } else if (isMounted.current) {
               console.warn("Profile fetch failed after auth state change");
               setUser(null);
               setIsAdmin(false);
             }
           } catch (error) {
             console.error("Error fetching profile after auth state change:", error);
-            if (isMounted) {
+            if (isMounted.current) {
               setUser(null);
               setIsAdmin(false);
             }
           } finally {
-            if (isMounted) {
+            if (isMounted.current) {
               setIsLoading(false);
               if (setAuthInitialized) setAuthInitialized(true);
               profileFetchInProgress.current = false;
@@ -161,23 +158,12 @@ export const useAuthState = ({
           }
           
           // Skip normal navigation for SIGNED_IN since it's handled directly in login
-          if (event === 'SIGNED_IN' && !navigationAttempted.value) {
+          if (event === 'SIGNED_IN' && !navigationAttempted.current) {
             console.log("Auth event SIGNED_IN, navigating to dashboard");
-            navigationAttempted.value = true;
-            
-            // Navigation with multiple methods
+            navigationAttempted.current = true;
             navigate('/dashboard', { replace: true });
-            
-            // Fallback navigation with delay
-            setTimeout(() => {
-              const currentPath = window.location.pathname;
-              if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
-                console.log("Still on auth page after SIGNED_IN event, forcing navigation");
-                window.location.href = '/dashboard';
-              }
-            }, 500);
           }
-        } else if (isMounted) {
+        } else if (isMounted.current) {
           console.log("No user in session after auth state change");
           setUser(null);
           setIsAdmin(false);
@@ -190,10 +176,10 @@ export const useAuthState = ({
           
           // Handle signed out event
           if (event === 'SIGNED_OUT') {
-            navigationAttempted.value = false; // Reset navigation flag
+            navigationAttempted.current = false; // Reset navigation flag
             localStorage.removeItem('auth_success');
             localStorage.removeItem('auth_timestamp');
-            navigate('/login');
+            navigate('/login', { replace: true });
           }
         }
         
@@ -210,7 +196,6 @@ export const useAuthState = ({
             title: "Successfully signed out",
             description: "You have been logged out successfully",
           });
-          navigate('/login');
         }
       }
     );
@@ -218,7 +203,7 @@ export const useAuthState = ({
     // Cleanup subscription on unmount
     return () => {
       console.log("Cleaning up auth state subscription");
-      isMounted = false;
+      isMounted.current = false;
       subscription.unsubscribe();
     };
   }, [navigate, setIsAdmin, setIsLoading, setSession, setUser, setAuthInitialized]);

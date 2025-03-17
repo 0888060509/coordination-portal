@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/common/ProtectedRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import { useEffect } from "react";
 import { checkAuthRedirect } from "./services/navigationService";
+import ErrorBoundary from "./components/common/ErrorBoundary";
 
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
@@ -36,8 +37,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// App router with root-level auth check
-const AppRouter = () => {
+const App = () => {
   // Check auth status at the root level
   useEffect(() => {
     // Immediate check
@@ -52,45 +52,49 @@ const AppRouter = () => {
   }, []);
   
   return (
-    <Routes>
-      {/* Auth Routes */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<UpdatePasswordPage />} />
-      
-      {/* Protected Routes */}
-      <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/rooms" element={<RoomsPage />} />
-        <Route path="/rooms/:id" element={<RoomDetailPage />} />
-        <Route path="/bookings" element={<BookingsPage />} />
-        <Route path="/bookings/:id" element={<BookingDetailPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-      </Route>
-      
-      {/* Redirects */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      
-      {/* 404 Route */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
+                {/* Auth Routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<UpdatePasswordPage />} />
+                
+                {/* Protected Routes */}
+                <Route 
+                  element={
+                    <ProtectedRoute>
+                      <DashboardLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/rooms" element={<RoomsPage />} />
+                  <Route path="/rooms/:id" element={<RoomDetailPage />} />
+                  <Route path="/bookings" element={<BookingsPage />} />
+                  <Route path="/bookings/:id" element={<BookingDetailPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                </Route>
+                
+                {/* Redirects */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                
+                {/* 404 Route */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </TooltipProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppRouter />
-        </TooltipProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  </QueryClientProvider>
-);
 
 export default App;
