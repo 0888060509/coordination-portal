@@ -11,7 +11,7 @@ export const bookingService = {
         .select(`
           *,
           rooms (*),
-          profiles!bookings_user_id_fkey (*)
+          profiles (*)
         `)
         .order('start_time', { ascending: true });
 
@@ -43,7 +43,7 @@ export const bookingService = {
         .select(`
           *,
           rooms (*),
-          profiles!bookings_user_id_fkey (*)
+          profiles (*)
         `)
         .eq('id', id)
         .single();
