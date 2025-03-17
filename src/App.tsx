@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/context/AuthContext';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
+import { setupAuthChangeNavigation } from '@/services/navigationService';
 
 // Page imports
 import Login from './pages/auth/LoginPage';
@@ -20,7 +21,13 @@ const App = () => {
   const { theme } = useTheme();
   const { isAuthenticated, isLoading, authInitialized } = useAuth();
 
-  // Check if the user is authenticated
+  // Set up auth change navigation handler
+  useEffect(() => {
+    const unsubscribe = setupAuthChangeNavigation();
+    return unsubscribe;
+  }, []);
+
+  // Protected route handler
   const ProtectedRoute = () => {
     if (isLoading || !authInitialized) {
       // You might want to render a loading spinner here

@@ -10,7 +10,7 @@ interface AdminRouteProps {
 }
 
 const AdminRoute = ({ children }: AdminRouteProps) => {
-  const { isAuthenticated, user, isLoading, isAdmin, authInitialized } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin, authInitialized } = useAuth();
   const location = useLocation();
   
   useEffect(() => {
