@@ -285,7 +285,7 @@ const RoomList = () => {
                       <SelectValue placeholder="All locations" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All locations</SelectItem>
+                      <SelectItem key="all-locations" value="_all">All locations</SelectItem>
                       {locations.map((location) => (
                         <SelectItem key={location} value={location}>
                           {location}
@@ -412,9 +412,9 @@ const RoomList = () => {
               <SelectValue placeholder="All locations" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All locations</SelectItem>
+              <SelectItem key="all-locations-desktop" value="_all">All locations</SelectItem>
               {locations.map((location) => (
-                <SelectItem key={location} value={location}>
+                <SelectItem key={`desktop-${location}`} value={location}>
                   {location}
                 </SelectItem>
               ))}
