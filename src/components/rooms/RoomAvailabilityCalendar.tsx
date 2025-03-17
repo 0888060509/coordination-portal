@@ -1,28 +1,18 @@
-
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { 
-  format, 
-  startOfWeek, 
-  endOfWeek, 
-  eachDayOfInterval, 
-  isSameDay, 
-  addWeeks, 
-  subWeeks,
-  startOfDay,
-  endOfDay,
-  addHours,
-  isBefore,
-  isAfter,
-  parseISO
-} from 'date-fns';
-import { ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import LoadingSpinner from '@/components/ui/loading-spinner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import roomService from '@/services/roomService';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CheckCircle, XCircle, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { format, addDays, isSameDay, parseISO } from 'date-fns';
+import { BookingWithDetails } from '@/types/booking';
+import { useQuery } from '@tanstack/react-query';
+import BookingModal from '../bookings/BookingModal';
+import { getRoomAvailability } from '@/services/roomService';
+import { getRoomBookings } from '@/services/bookingService';
 import { cn } from '@/lib/utils';
 
 interface RoomAvailabilityCalendarProps {
@@ -54,7 +44,7 @@ const RoomAvailabilityCalendar = ({
   // Fetch availability data
   const { data: availabilityData, isLoading, error } = useQuery({
     queryKey: ['roomAvailability', roomId, startDate.toISOString(), endDate.toISOString()],
-    queryFn: () => roomService.getRoomAvailability(roomId, startDate, endDate),
+    queryFn: () => getRoomAvailability(roomId, startDate, endDate),
   });
 
   // Handle date selection

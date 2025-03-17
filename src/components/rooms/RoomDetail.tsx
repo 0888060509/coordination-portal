@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Building2, Users, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { Building2, Users, Info, CalendarRange } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -21,19 +21,16 @@ const RoomDetail = () => {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  // Fetch room data
   const { data: room, isLoading, error } = useQuery({
     queryKey: ['room', id],
     queryFn: () => id ? roomService.getRoomById(id) : null,
     enabled: !!id,
   });
 
-  // Handle booking click
   const handleBookRoom = () => {
     setIsBookingModalOpen(true);
   };
 
-  // Handle date selection from calendar
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
   };
@@ -57,7 +54,6 @@ const RoomDetail = () => {
     );
   }
 
-  // Status badge color based on room status
   const statusColor = {
     available: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
     maintenance: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -66,7 +62,6 @@ const RoomDetail = () => {
 
   return (
     <div className="animate-fade-in space-y-8">
-      {/* Room Header */}
       <div className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-3xl font-bold">{room.name}</h1>
@@ -95,13 +90,11 @@ const RoomDetail = () => {
         </Button>
       </div>
 
-      {/* Room Gallery */}
       <RoomGallery 
         imageUrl={room.image_url} 
         roomName={room.name} 
       />
 
-      {/* Room Information Tabs */}
       <Tabs defaultValue="details" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="details">Details</TabsTrigger>
@@ -109,7 +102,6 @@ const RoomDetail = () => {
           <TabsTrigger value="availability">Availability</TabsTrigger>
         </TabsList>
         
-        {/* Details Tab */}
         <TabsContent value="details" className="py-4">
           <Card>
             <CardContent className="p-6">
@@ -149,7 +141,6 @@ const RoomDetail = () => {
           </Card>
         </TabsContent>
         
-        {/* Amenities Tab */}
         <TabsContent value="amenities" className="py-4">
           <Card>
             <CardContent className="p-6">
@@ -158,7 +149,6 @@ const RoomDetail = () => {
           </Card>
         </TabsContent>
         
-        {/* Availability Tab */}
         <TabsContent value="availability" className="py-4">
           <Card>
             <CardContent className="p-6">
@@ -171,7 +161,6 @@ const RoomDetail = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Booking Modal */}
       <BookingModal
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}

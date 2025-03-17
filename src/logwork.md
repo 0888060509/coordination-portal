@@ -43,3 +43,17 @@ These fixes resolved several build errors and improved the application's structu
 - Updated BookingService to handle attendees and equipment_needed fields
 
 These changes resolved numerous build errors and import issues, ensuring a stable application with proper type safety.
+
+## Service Modules Refactoring and Fixing Import Errors
+
+- Refactored bookingService.ts to support both named exports and default export
+- Fixed roomService.ts to remove duplicate export declarations
+- Updated dashboardService.ts to use proper imports from service modules
+- Fixed imports in BookingDetails.tsx to handle attendee objects correctly
+- Updated imports in components to use the correct named exports or default exports
+- Fixed type errors in service functions to properly handle additional properties
+- Corrected import paths throughout the application to use consistent naming
+- Added proper attendee handling in BookingDetails component
+
+These changes resolved the import errors and TypeScript type errors, ensuring that the service modules work correctly with the components that consume them.
+

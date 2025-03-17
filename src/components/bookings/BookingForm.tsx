@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -10,7 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { RoomWithAmenities } from "@/types/room";
 import { BookingWithDetails, CreateBookingData } from "@/types/booking";
-import bookingService from "@/services/bookingService";
+import { createBooking, getBookingById } from "@/services/bookingService";
 import * as notificationService from "@/services/notificationService";
 import MeetingDetailsForm from "./MeetingDetailsForm";
 import AttendeesForm from "./AttendeesForm";
@@ -27,19 +26,15 @@ interface BookingFormProps {
   onCancel?: () => void;
 }
 
-// Define the form schema for all steps collectively
 const bookingFormSchema = z.object({
-  // Step 1: Date and Time (pre-filled)
   date: z.date(),
   startTime: z.string(),
   endTime: z.string(),
   
-  // Step 2: Meeting Details
   title: z.string().min(3, { message: "Title must be at least 3 characters" }),
   description: z.string().optional(),
   meetingType: z.string().optional(),
   
-  // Step 3: Attendees and Resources
   attendees: z.array(z.object({
     id: z.string(),
     name: z.string(),
@@ -50,7 +45,6 @@ const bookingFormSchema = z.object({
   equipment: z.array(z.string()).optional(),
   specialRequests: z.string().optional(),
   
-  // Step 4: Review
   termsAccepted: z.boolean().refine(val => val === true, {
     message: "You must accept the terms and conditions"
   })
@@ -72,7 +66,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
   const [bookingComplete, setBookingComplete] = useState(false);
   const [createdBooking, setCreatedBooking] = useState<BookingWithDetails | null>(null);
   
-  // Initialize the form with react-hook-form and zod resolver
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     defaultValues: {
@@ -125,11 +118,9 @@ const BookingForm: React.FC<BookingFormProps> = ({
     try {
       setIsSubmitting(true);
       
-      // Create start and end date objects
       const startDateTime = parseTimeString(data.startTime, data.date);
       const endDateTime = parseTimeString(data.endTime, data.date);
       
-      // Prepare booking data
       const bookingData: CreateBookingData = {
         room_id: room.id,
         user_id: user.id,
@@ -143,17 +134,12 @@ const BookingForm: React.FC<BookingFormProps> = ({
         special_requests: data.specialRequests
       };
       
-      // Create booking
-      const bookingId = await bookingService.createBooking(bookingData);
+      const bookingId = await createBooking(bookingData);
       
-      // Fetch the created booking with details
-      const bookingDetails = await bookingService.getBookingById(bookingId);
+      const bookingDetails = await getBookingById(bookingId);
       
       if (bookingDetails) {
-        // Send booking confirmation notification
         await notificationService.sendBookingConfirmation(bookingId);
-        
-        // Set created booking and mark as complete
         setCreatedBooking(bookingDetails);
         setBookingComplete(true);
       }
@@ -168,7 +154,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
     }
   };
   
-  // Render the confirmation screen if booking is complete
   if (bookingComplete && createdBooking) {
     return (
       <BookingConfirmation 
@@ -178,7 +163,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
     );
   }
   
-  // Render current step form
   const renderStep = () => {
     switch (currentStep) {
       case 1:

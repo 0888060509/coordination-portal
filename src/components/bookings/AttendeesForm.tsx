@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { useQuery } from "@tanstack/react-query";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import bookingService from "@/services/bookingService";
+import { getAvailableUsers } from "@/services/bookingService";
 
 interface AttendeesFormProps {
   form: UseFormReturn<any>;
@@ -37,7 +37,7 @@ const AttendeesForm: React.FC<AttendeesFormProps> = ({ form, formErrors }) => {
   // Get available users for attendees
   const { data: users } = useQuery({
     queryKey: ['users'],
-    queryFn: () => bookingService.getAvailableUsers(),
+    queryFn: () => getAvailableUsers(),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
   

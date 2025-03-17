@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { ThemeProvider } from "./components/theme-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 import { useTheme } from 'next-themes';
 import Login from './pages/auth/LoginPage';
 import Register from './pages/auth/RegisterPage';

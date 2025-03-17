@@ -127,10 +127,16 @@ export const getRoomAvailability = async (
   }
 };
 
-// Export functions
-export {
-  getRoom as getRoomById,
+// Export as named functions
+export const getRoomById = getRoom;
+
+// Export as a default object
+const roomService = {
+  getRoom,
+  getRoomById,
   getRoomWithAmenities,
   getRooms,
   getRoomAvailability
 };
+
+export default roomService;
