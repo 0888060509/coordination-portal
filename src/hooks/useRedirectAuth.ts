@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { checkAuthAndRedirect, setupAuthChangeNavigation } from '@/services/navigationService';
+import { checkAuthAndRedirect, setupAuthChangeNavigation, navigateToDashboard, navigateToLogin, navigateTo } from '@/services/navigationService';
 
 /**
  * A simplified hook that handles authentication redirects
@@ -59,19 +59,13 @@ export function useRedirectAuth() {
   // Return navigation helpers for backwards compatibility
   return {
     forceToDashboard: () => {
-      import('@/services/navigationService').then(({ navigateToDashboard }) => {
-        navigateToDashboard({ source: 'useRedirectAuth.forceToDashboard' });
-      });
+      navigateToDashboard({ source: 'useRedirectAuth.forceToDashboard' });
     },
     forceToLogin: () => {
-      import('@/services/navigationService').then(({ navigateToLogin }) => {
-        navigateToLogin({ source: 'useRedirectAuth.forceToLogin' });
-      });
+      navigateToLogin({ source: 'useRedirectAuth.forceToLogin' });
     },
     navigateTo: (path: string) => {
-      import('@/services/navigationService').then(({ navigateTo }) => {
-        navigateTo(path, { source: 'useRedirectAuth.navigateTo' });
-      });
+      navigateTo(path, { source: 'useRedirectAuth.navigateTo' });
     }
   };
 }

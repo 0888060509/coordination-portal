@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -5,7 +6,7 @@ import { supabase, handleSupabaseError, storeOAuthState, processAuthHash } from 
 import { User } from "@/types/user";
 import { Session, AuthError } from "@supabase/supabase-js";
 import { fetchProfile } from "@/utils/userTransform";
-import { forceToDashboard } from "@/services/navigationService";
+import { navigateToDashboard } from "@/services/navigationService";
 
 /**
  * Hook that provides all auth methods
@@ -94,7 +95,7 @@ export const useAuthMethods = (
       
       // Use a short delay to ensure state updates have completed
       setTimeout(() => {
-        forceToDashboard('login-function');
+        navigateToDashboard({ source: 'login-function' });
       }, 100);
       
       // Clear loading state
