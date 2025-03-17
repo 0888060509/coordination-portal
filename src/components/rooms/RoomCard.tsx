@@ -16,6 +16,8 @@ import { Users, MapPin } from 'lucide-react';
 import { RoomWithAmenities } from '@/types/room';
 import BookingModal from '@/components/bookings/BookingModal';
 import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface RoomCardProps {
   room: RoomWithAmenities;
@@ -27,6 +29,8 @@ interface RoomCardProps {
 const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
   const navigate = useNavigate();
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   
   // Default placeholder image if none provided
   const imageUrl = room.image_url || 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80';
@@ -34,6 +38,20 @@ const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
   const handleViewDetails = () => {
     // Navigate to room details page
     navigate(`/rooms/${room.id}`);
+  };
+  
+  const handleBookRoom = () => {
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to book a room",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+    
+    setIsBookingModalOpen(true);
   };
   
   return (
@@ -93,7 +111,7 @@ const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
             </Button>
             <Button
               className="flex-1"
-              onClick={() => setIsBookingModalOpen(true)}
+              onClick={handleBookRoom}
             >
               Book
             </Button>

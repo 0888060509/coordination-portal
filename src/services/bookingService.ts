@@ -6,12 +6,23 @@ export const bookingService = {
   // Get all bookings for the current user
   async getUserBookings(): Promise<BookingWithDetails[]> {
     try {
-      const { data: userData } = await supabase.auth.getUser();
+      console.log("Fetching user bookings");
+      
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error("Error getting current user:", userError);
+        throw userError;
+      }
+      
       const userId = userData.user?.id;
 
       if (!userId) {
+        console.error("No authenticated user found");
         throw new Error('User not authenticated');
       }
+
+      console.log("Fetching bookings for user:", userId);
 
       // First, get all bookings for the current user
       const { data: bookingsData, error: bookingsError } = await supabase
@@ -24,8 +35,11 @@ export const bookingService = {
         .order('start_time', { ascending: true });
 
       if (bookingsError) {
+        console.error("Error fetching user bookings:", bookingsError);
         throw bookingsError;
       }
+
+      console.log("Bookings data from Supabase:", bookingsData);
 
       // Get user profile separately since there's no direct FK relationship
       const { data: profileData, error: profileError } = await supabase
@@ -35,8 +49,11 @@ export const bookingService = {
         .single();
 
       if (profileError) {
+        console.error("Error fetching user profile:", profileError);
         throw profileError;
       }
+
+      console.log("Profile data from Supabase:", profileData);
 
       // Format the data to match our BookingWithDetails type
       const bookings = bookingsData.map(booking => ({
@@ -46,9 +63,11 @@ export const bookingService = {
         rooms: undefined,
       })) as unknown as BookingWithDetails[];
 
+      console.log("Processed bookings data:", bookings);
+      
       return bookings;
     } catch (error) {
-      console.error('Error fetching user bookings:', error);
+      console.error('Error in getUserBookings:', error);
       throw error;
     }
   },
@@ -56,6 +75,8 @@ export const bookingService = {
   // Get a specific booking by ID
   async getBookingById(id: string): Promise<BookingWithDetails | null> {
     try {
+      console.log("Fetching booking by ID:", id);
+      
       // First, get the booking
       const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
@@ -67,12 +88,16 @@ export const bookingService = {
         .single();
 
       if (bookingError) {
+        console.error("Error fetching booking by ID:", bookingError);
         throw bookingError;
       }
 
       if (!bookingData) {
+        console.log("No booking found with ID:", id);
         return null;
       }
+
+      console.log("Booking data from Supabase:", bookingData);
 
       // Get user profile separately
       const { data: profileData, error: profileError } = await supabase
@@ -82,8 +107,11 @@ export const bookingService = {
         .single();
 
       if (profileError) {
+        console.error("Error fetching user profile:", profileError);
         throw profileError;
       }
+
+      console.log("Profile data from Supabase:", profileData);
 
       // Format the data to match our BookingWithDetails type
       const booking = {
@@ -93,9 +121,11 @@ export const bookingService = {
         rooms: undefined,
       } as unknown as BookingWithDetails;
 
+      console.log("Processed booking data:", booking);
+      
       return booking;
     } catch (error) {
-      console.error('Error fetching booking:', error);
+      console.error('Error in getBookingById:', error);
       throw error;
     }
   },
@@ -103,6 +133,8 @@ export const bookingService = {
   // Create a new booking
   async createBooking(bookingData: CreateBookingData): Promise<string> {
     try {
+      console.log("Creating new booking:", bookingData);
+      
       // Prepare booking data with all fields
       const booking = {
         room_id: bookingData.room_id,
@@ -116,6 +148,8 @@ export const bookingService = {
         status: 'confirmed'
       };
 
+      console.log("Prepared booking data:", booking);
+
       // Use create_booking RPC function which handles conflict checking
       const { data, error } = await supabase.rpc('create_booking', {
         p_room_id: booking.room_id,
@@ -127,15 +161,19 @@ export const bookingService = {
       });
 
       if (error) {
+        console.error("Error creating booking:", error);
         throw error;
       }
+
+      console.log("Booking created, received ID:", data);
 
       // The RPC function returns the booking ID
       const bookingId = data as string;
       
       // Update the booking with additional fields
-      // (RPC doesn't handle all fields, so we update separately)
       if (booking.meeting_type || booking.special_requests) {
+        console.log("Updating booking with additional details");
+        
         const { error: updateError } = await supabase
           .from('bookings')
           .update({
@@ -146,12 +184,13 @@ export const bookingService = {
 
         if (updateError) {
           console.error('Error updating booking with additional details:', updateError);
-          // Don't throw here - the booking was created, just the extra fields weren't updated
         }
       }
 
       // If attendees are provided, add them
       if (bookingData.attendees && bookingData.attendees.length > 0) {
+        console.log("Adding attendees to booking:", bookingData.attendees);
+        
         const attendeesData = bookingData.attendees.map(attendeeId => ({
           booking_id: bookingId,
           user_id: attendeeId,
@@ -164,13 +203,12 @@ export const bookingService = {
 
         if (attendeesError) {
           console.error('Error adding booking attendees:', attendeesError);
-          // Don't throw here - the booking was created, just the attendees weren't added
         }
       }
 
       return bookingId;
     } catch (error) {
-      console.error('Error creating booking:', error);
+      console.error('Error in createBooking:', error);
       throw error;
     }
   },
@@ -178,8 +216,12 @@ export const bookingService = {
   // Update an existing booking
   async updateBooking(id: string, bookingData: Partial<Booking>): Promise<void> {
     try {
+      console.log("Updating booking:", id, bookingData);
+      
       // If updating times, check availability first
       if (bookingData.start_time && bookingData.end_time) {
+        console.log("Checking availability for updated time slot");
+        
         const { data: isAvailable, error: availabilityError } = await supabase.rpc(
           'check_room_availability',
           {
@@ -191,6 +233,7 @@ export const bookingService = {
         );
 
         if (availabilityError) {
+          console.error("Error checking room availability:", availabilityError);
           throw availabilityError;
         }
 
@@ -205,10 +248,13 @@ export const bookingService = {
         .eq('id', id);
 
       if (error) {
+        console.error("Error updating booking:", error);
         throw error;
       }
+
+      console.log("Booking updated successfully");
     } catch (error) {
-      console.error('Error updating booking:', error);
+      console.error('Error in updateBooking:', error);
       throw error;
     }
   },
@@ -216,6 +262,8 @@ export const bookingService = {
   // Cancel a booking
   async cancelBooking(id: string, reason?: string): Promise<void> {
     try {
+      console.log("Cancelling booking:", id, reason);
+      
       const { error } = await supabase
         .from('bookings')
         .update({ 
@@ -225,10 +273,13 @@ export const bookingService = {
         .eq('id', id);
 
       if (error) {
+        console.error("Error cancelling booking:", error);
         throw error;
       }
+
+      console.log("Booking cancelled successfully");
     } catch (error) {
-      console.error('Error cancelling booking:', error);
+      console.error('Error in cancelBooking:', error);
       throw error;
     }
   },
@@ -236,16 +287,21 @@ export const bookingService = {
   // Delete a booking
   async deleteBooking(id: string): Promise<void> {
     try {
+      console.log("Deleting booking:", id);
+      
       const { error } = await supabase
         .from('bookings')
         .delete()
         .eq('id', id);
 
       if (error) {
+        console.error("Error deleting booking:", error);
         throw error;
       }
+
+      console.log("Booking deleted successfully");
     } catch (error) {
-      console.error('Error deleting booking:', error);
+      console.error('Error in deleteBooking:', error);
       throw error;
     }
   },
@@ -253,6 +309,12 @@ export const bookingService = {
   // Get all bookings for a specific room
   async getRoomBookings(roomId: string, startDate: Date, endDate: Date): Promise<Booking[]> {
     try {
+      console.log("Fetching room bookings:", {
+        roomId,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      });
+      
       const { data, error } = await supabase
         .from('bookings')
         .select('*')
@@ -263,15 +325,16 @@ export const bookingService = {
         .order('start_time');
 
       if (error) {
+        console.error("Error fetching room bookings:", error);
         throw error;
       }
 
+      console.log("Room bookings data:", data);
+      
       return data as Booking[];
     } catch (error) {
-      console.error('Error fetching room bookings:', error);
+      console.error('Error in getRoomBookings:', error);
       throw error;
     }
   }
 };
-
-export default bookingService;

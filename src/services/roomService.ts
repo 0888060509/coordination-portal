@@ -16,11 +16,14 @@ export const roomService = {
   // Get all rooms with optional filtering
   async getRooms(filters?: RoomFilterOptions): Promise<RoomWithAmenities[]> {
     try {
+      console.log("Fetching rooms with filters:", filters);
+      
       let query = supabase
         .from('rooms')
         .select(`
           *,
-          room_amenities!inner (
+          room_amenities (
+            amenity_id,
             amenities (*)
           )
         `)
@@ -34,7 +37,7 @@ export const roomService = {
         }
 
         // Filter by location
-        if (filters.location) {
+        if (filters.location && filters.location !== '_all') {
           query = query.eq('location', filters.location);
         }
 
@@ -42,26 +45,32 @@ export const roomService = {
         if (filters.searchQuery) {
           query = query.or(`name.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`);
         }
-
-        // Filter by amenities (requires post-processing)
-        // We'll handle amenity filtering after fetching the results
       }
 
       const { data, error } = await query;
 
       if (error) {
+        console.error("Error fetching rooms from Supabase:", error);
         throw error;
       }
 
+      console.log("Rooms data from Supabase:", data);
+
       // Process the data to match our RoomWithAmenities type
       let rooms = data.map(room => {
-        const amenities = room.room_amenities.map((ra: any) => ra.amenities);
+        // Extract amenities from the nested structure
+        const amenities = room.room_amenities 
+          ? room.room_amenities.map((ra: any) => ra.amenities).filter(Boolean)
+          : [];
+        
         return {
           ...room,
           amenities,
           room_amenities: undefined // Remove the nested structure
         } as unknown as RoomWithAmenities;
       });
+
+      console.log("Processed rooms data:", rooms);
 
       // Post-process for amenity filtering
       if (filters?.amenities && filters.amenities.length > 0) {
@@ -87,22 +96,33 @@ export const roomService = {
         const startTimeIso = startDate.toISOString();
         const endTimeIso = endDate.toISOString();
         
+        console.log("Checking availability for timeframe:", {
+          startTimeIso,
+          endTimeIso
+        });
+        
         // Filter out rooms that are not available during the requested time
         const availableRooms = await Promise.all(
           rooms.map(async (room) => {
-            const { data: isAvailable, error } = await supabase
-              .rpc('check_room_availability', {
-                room_id: room.id,
-                start_time: startTimeIso,
-                end_time: endTimeIso
-              });
-            
-            if (error) {
-              console.error('Error checking room availability:', error);
+            try {
+              const { data: isAvailable, error } = await supabase
+                .rpc('check_room_availability', {
+                  room_id: room.id,
+                  start_time: startTimeIso,
+                  end_time: endTimeIso
+                });
+              
+              if (error) {
+                console.error('Error checking room availability:', error);
+                return null;
+              }
+              
+              console.log(`Room ${room.id} availability:`, isAvailable);
+              return isAvailable ? room : null;
+            } catch (err) {
+              console.error(`Error in availability check for room ${room.id}:`, err);
               return null;
             }
-            
-            return isAvailable ? room : null;
           })
         );
         
@@ -112,7 +132,7 @@ export const roomService = {
 
       return rooms;
     } catch (error) {
-      console.error('Error fetching rooms:', error);
+      console.error('Error in getRooms:', error);
       throw error;
     }
   },
@@ -120,11 +140,14 @@ export const roomService = {
   // Get a single room by ID
   async getRoomById(id: string): Promise<RoomWithAmenities | null> {
     try {
+      console.log("Fetching room by ID:", id);
+      
       const { data, error } = await supabase
         .from('rooms')
         .select(`
           *,
           room_amenities (
+            amenity_id,
             amenities (*)
           )
         `)
@@ -132,22 +155,33 @@ export const roomService = {
         .single();
 
       if (error) {
+        console.error("Error fetching room by ID:", error);
         throw error;
       }
 
       if (!data) {
+        console.log("No room found with ID:", id);
         return null;
       }
 
+      console.log("Room data from Supabase:", data);
+
       // Process the data to match our RoomWithAmenities type
-      const amenities = data.room_amenities.map((ra: any) => ra.amenities);
-      return {
+      const amenities = data.room_amenities 
+        ? data.room_amenities.map((ra: any) => ra.amenities).filter(Boolean)
+        : [];
+      
+      const room = {
         ...data,
         amenities,
         room_amenities: undefined // Remove the nested structure
       } as unknown as RoomWithAmenities;
+
+      console.log("Processed room data:", room);
+      
+      return room;
     } catch (error) {
-      console.error('Error fetching room:', error);
+      console.error('Error in getRoomById:', error);
       throw error;
     }
   },
@@ -155,18 +189,23 @@ export const roomService = {
   // Get all available amenities
   async getAmenities(): Promise<Amenity[]> {
     try {
+      console.log("Fetching amenities");
+      
       const { data, error } = await supabase
         .from('amenities')
         .select('*')
         .order('name');
 
       if (error) {
+        console.error("Error fetching amenities:", error);
         throw error;
       }
 
+      console.log("Amenities data from Supabase:", data);
+      
       return data as Amenity[];
     } catch (error) {
-      console.error('Error fetching amenities:', error);
+      console.error('Error in getAmenities:', error);
       throw error;
     }
   },
@@ -174,6 +213,8 @@ export const roomService = {
   // Get all unique locations for filtering
   async getLocations(): Promise<string[]> {
     try {
+      console.log("Fetching locations");
+      
       const { data, error } = await supabase
         .from('rooms')
         .select('location')
@@ -181,14 +222,19 @@ export const roomService = {
         .order('location');
 
       if (error) {
+        console.error("Error fetching locations:", error);
         throw error;
       }
 
+      console.log("Locations data from Supabase:", data);
+      
       // Extract unique locations
       const locations = [...new Set(data.map(room => room.location))];
+      console.log("Processed locations:", locations);
+      
       return locations;
     } catch (error) {
-      console.error('Error fetching locations:', error);
+      console.error('Error in getLocations:', error);
       throw error;
     }
   },
@@ -201,6 +247,13 @@ export const roomService = {
     excludeBookingId?: string
   ): Promise<boolean> {
     try {
+      console.log("Checking room availability:", {
+        roomId,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        excludeBookingId
+      });
+      
       const { data, error } = await supabase.rpc('check_room_availability', {
         room_id: roomId,
         start_time: startTime.toISOString(),
@@ -209,12 +262,15 @@ export const roomService = {
       });
 
       if (error) {
+        console.error("Error checking room availability:", error);
         throw error;
       }
 
-      return data;
+      console.log("Room availability result:", data);
+      
+      return !!data;
     } catch (error) {
-      console.error('Error checking room availability:', error);
+      console.error('Error in checkRoomAvailability:', error);
       throw error;
     }
   }
