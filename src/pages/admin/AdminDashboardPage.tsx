@@ -19,17 +19,19 @@ const AdminDashboardPage = () => {
     queryFn: () => adminService.getAdminStats(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
-    onSettled: (data, error) => {
-      if (error) {
-        console.error("Error fetching admin stats:", error);
-        toast({
-          variant: "destructive",
-          title: "Error loading dashboard",
-          description: error.message || "Failed to load admin statistics",
-        });
-      }
-    },
   });
+
+  // Handle error with a useEffect instead of in the query options
+  React.useEffect(() => {
+    if (error) {
+      console.error("Error fetching admin stats:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading dashboard",
+        description: (error as Error).message || "Failed to load admin statistics",
+      });
+    }
+  }, [error]);
 
   if (isLoading) {
     return (
