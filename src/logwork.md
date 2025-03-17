@@ -3,6 +3,11 @@
 
 ## Latest Updates
 
+### [Date: 2025-03-24] - Fixed TypeScript Type Error in roomService.ts
+- Fixed type error in getRoomAmenities function by properly casting the amenities data
+- Corrected the data extraction process to ensure proper typing of amenity objects
+- Updated documentation to reflect the changes
+
 ### [Date: 2025-03-23] - Fixed TypeScript Type Errors in Room Components
 - Fixed type error in RoomFilters.tsx by properly typing sortBy state variable
 - Corrected the return type in getRoomAmenities function in roomService.ts

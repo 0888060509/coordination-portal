@@ -266,9 +266,9 @@ export const roomService = {
         throw error;
       }
 
-      // Properly extract and flatten the amenities from the nested structure
-      // Each item in 'data' has an 'amenities' property containing the amenity object
-      const amenities: Amenity[] = data.map(item => item.amenities as Amenity);
+      // Properly extract the amenities from the nested structure
+      // Each item in 'data' has an 'amenities' property containing a single amenity object
+      const amenities: Amenity[] = data.map(item => item.amenities) as Amenity[];
       
       return amenities || [];
     } catch (error) {
