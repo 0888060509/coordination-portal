@@ -29,6 +29,11 @@ export interface CreateBookingData {
   description?: string;
   start_time: Date;
   end_time: Date;
+  attendees?: string[];
+  meeting_type?: string;
+  equipment_needed?: string[];
+  special_requests?: string;
+  recurring_pattern_id?: string;
 }
 
 export interface RecurringPattern {
