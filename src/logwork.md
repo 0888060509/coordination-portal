@@ -38,3 +38,13 @@ The navigation issue was caused by incorrect route definitions and page componen
 - Improved the styling of NavItem to better handle expanded and collapsed states
 
 The issue was caused by a mismatch between the props expected by the NavItem component and the props being passed to it from the Sidebar. The NavItem component expected props like `expanded` and `children`, but was receiving `label` and `expanded`. The fix ensures that the correct props are used consistently.
+
+## 2025-03-18: Fixed Page Content Not Displaying Due to Data Fetching Issues
+
+- Fixed issues with data fetching in bookings and notifications components
+- Updated useBookings hook to correctly use the authenticated user's ID
+- Ensured proper error handling for database queries when user is not authenticated
+- Enhanced BookingsPage layout with proper header component
+- Fixed AppLayout to ensure proper rendering of route content
+
+The issue was caused by hardcoded user IDs ("123") being used in database queries instead of the actual authenticated user's ID. This resulted in SQL errors in the backend and prevented data from being displayed. The fix ensures that the authenticated user's ID is properly used in all database requests.
