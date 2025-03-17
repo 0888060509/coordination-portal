@@ -12,3 +12,13 @@
 - Fixed import paths for getBooking in bookingService
 - Added proper mapping between Room and RoomWithAmenities types
 - Fixed roomService to provide status and amenities properties
+
+## June 14, 2024
+- Fixed function name mismatches (getBookingById -> getBooking, getRoom -> getRoomById)
+- Added missing required props (date, startTime, endTime) to RoomCard component
+- Fixed type issues with Room vs RoomWithAmenities in DashboardPage
+- Updated RoomSearch and RoomFilters components to match expected prop interfaces
+- Added proper filtering parameters to roomService.ts
+- Implemented full dashboard service with proper type definitions
+- Created proper type definitions for function parameters
+- Added mapping functions to convert between Room and RoomWithAmenities types

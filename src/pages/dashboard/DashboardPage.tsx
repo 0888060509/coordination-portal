@@ -9,6 +9,7 @@ import { TodayBookings } from '@/components/dashboard/TodayBookings';
 import { AvailableRooms } from '@/components/dashboard/AvailableRooms';
 import { useQuery } from '@tanstack/react-query';
 import dashboardService from '@/services/dashboardService';
+import { RoomWithAmenities } from '@/types/room';
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -23,7 +24,7 @@ const DashboardPage = () => {
       if (!user?.id) throw new Error('User not authenticated');
       
       // Get all dashboard data
-      return dashboardService.getDashboardData(user.id);
+      return dashboardService.getDashboardStats(user.id);
     },
     enabled: !!user?.id,
   });
@@ -35,6 +36,14 @@ const DashboardPage = () => {
   if (error) {
     return <div className="text-red-500">Error loading dashboard data: {(error as Error).message}</div>;
   }
+
+  // Convert Room[] to RoomWithAmenities[] if needed
+  const availableRooms: RoomWithAmenities[] = dashboardData?.availableRooms ? 
+    dashboardData.availableRooms.map(room => ({
+      ...room,
+      amenities: room.amenities || [],
+      status: room.is_active ? 'available' : 'inactive'
+    })) : [];
 
   return (
     <div className="space-y-8">
@@ -50,7 +59,7 @@ const DashboardPage = () => {
             <UpcomingBookings bookings={dashboardData.upcomingBookings} />
             <div className="space-y-6">
               <TodayBookings bookings={dashboardData.todayBookings} />
-              <AvailableRooms rooms={dashboardData.availableRooms} />
+              <AvailableRooms rooms={availableRooms} />
             </div>
           </div>
         </>

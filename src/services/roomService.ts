@@ -2,8 +2,19 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Room, RoomWithAmenities, Amenity } from '@/types/room';
 
+interface GetRoomsParams {
+  capacity?: number;
+  location?: string;
+  status?: 'available' | 'maintenance' | 'inactive';
+  amenities?: string[];
+  date?: Date | null;
+  startTime?: string;
+  endTime?: string;
+  sortBy?: 'name' | 'capacity' | 'capacity_asc';
+}
+
 // Get all rooms with optional filtering
-export const getRooms = async ({ filterOptions } = {}) => {
+export const getRooms = async (params: GetRoomsParams = {}) => {
   try {
     let query = supabase
       .from('rooms')
@@ -15,18 +26,18 @@ export const getRooms = async ({ filterOptions } = {}) => {
       `);
 
     // Apply filters if provided
-    if (filterOptions) {
-      if (filterOptions.capacity) {
-        query = query.gte('capacity', filterOptions.capacity);
+    if (params) {
+      if (params.capacity) {
+        query = query.gte('capacity', params.capacity);
       }
       
-      if (filterOptions.location) {
-        query = query.eq('location', filterOptions.location);
+      if (params.location) {
+        query = query.eq('location', params.location);
       }
       
-      if (filterOptions.status === 'available') {
+      if (params.status === 'available') {
         query = query.eq('is_active', true);
-      } else if (filterOptions.status === 'inactive') {
+      } else if (params.status === 'inactive') {
         query = query.eq('is_active', false);
       }
       

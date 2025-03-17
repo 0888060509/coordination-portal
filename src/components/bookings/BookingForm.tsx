@@ -9,7 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { RoomWithAmenities } from "@/types/room";
 import { BookingWithDetails, CreateBookingData } from "@/types/booking";
-import { createBooking, getBookingById } from "@/services/bookingService";
+import { createBooking, getBooking } from "@/services/bookingService";
 import * as notificationService from "@/services/notificationService";
 import MeetingDetailsForm from "./MeetingDetailsForm";
 import AttendeesForm from "./AttendeesForm";
@@ -136,7 +136,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
       
       const bookingId = await createBooking(bookingData);
       
-      const bookingDetails = await getBookingById(bookingId);
+      const bookingDetails = await getBooking(bookingId);
       
       if (bookingDetails) {
         await notificationService.sendBookingConfirmation(bookingId);

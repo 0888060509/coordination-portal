@@ -5,21 +5,53 @@ import RoomList from '@/components/rooms/RoomList';
 import RoomFilters from '@/components/rooms/RoomFilters';
 import RoomSearch from '@/components/rooms/RoomSearch';
 import { useQuery } from '@tanstack/react-query';
+import { Amenity } from '@/types/room';
 
 const RoomsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
+  const [filterParams, setFilterParams] = useState({
     capacity: 0,
-    location: '',
-    amenities: [],
+    location: '_all',
+    amenities: [] as string[],
     date: null,
     timeRange: { start: '', end: '' },
   });
+  const [locations, setLocations] = useState<string[]>([]);
+  const [amenities, setAmenities] = useState<Amenity[]>([]);
+  const [viewType, setViewType] = useState<'grid' | 'list'>('grid');
 
+  // Fetch room data with filtering
   const { data: rooms = [], isLoading, error } = useQuery({
-    queryKey: ['rooms', filters],
-    queryFn: () => getRooms({ filterOptions: filters }),
+    queryKey: ['rooms', filterParams],
+    queryFn: () => getRooms({ 
+      capacity: filterParams.capacity > 0 ? filterParams.capacity : undefined,
+      location: filterParams.location !== '_all' ? filterParams.location : undefined,
+      amenities: filterParams.amenities.length > 0 ? filterParams.amenities : undefined,
+      date: filterParams.date,
+      startTime: filterParams.timeRange.start || undefined,
+      endTime: filterParams.timeRange.end || undefined
+    }),
   });
+
+  // Extract unique locations and amenities for filters
+  useEffect(() => {
+    if (rooms.length > 0) {
+      const uniqueLocations = [...new Set(rooms.map(r => r.location))];
+      setLocations(uniqueLocations);
+      
+      const allAmenities: Amenity[] = [];
+      rooms.forEach(room => {
+        if (room.amenities) {
+          room.amenities.forEach(amenity => {
+            if (!allAmenities.some(a => a.id === amenity.id)) {
+              allAmenities.push(amenity);
+            }
+          });
+        }
+      });
+      setAmenities(allAmenities);
+    }
+  }, [rooms]);
 
   // Filter rooms based on search query
   const filteredRooms = React.useMemo(() => {
@@ -37,10 +69,42 @@ const RoomsPage = () => {
   };
 
   const handleFilterChange = (newFilters: any) => {
-    setFilters(prev => ({
+    setFilterParams(prev => ({
       ...prev,
       ...newFilters
     }));
+  };
+
+  const handleToggleAmenity = (amenityId: string) => {
+    setFilterParams(prev => {
+      const amenities = [...prev.amenities];
+      const index = amenities.indexOf(amenityId);
+      
+      if (index >= 0) {
+        amenities.splice(index, 1);
+      } else {
+        amenities.push(amenityId);
+      }
+      
+      return {
+        ...prev,
+        amenities
+      };
+    });
+  };
+
+  const handleResetFilters = () => {
+    setFilterParams({
+      capacity: 0,
+      location: '_all',
+      amenities: [],
+      date: null,
+      timeRange: { start: '', end: '' },
+    });
+  };
+
+  const handleViewTypeChange = (type: 'grid' | 'list') => {
+    setViewType(type);
   };
 
   return (
@@ -53,8 +117,15 @@ const RoomsPage = () => {
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="lg:w-1/4">
           <RoomFilters 
-            filters={filters} 
-            onFilterChange={handleFilterChange} 
+            amenities={amenities}
+            locations={locations}
+            selectedAmenities={filterParams.amenities}
+            selectedLocation={filterParams.location}
+            onFilterChange={handleFilterChange}
+            onToggleAmenity={handleToggleAmenity}
+            onResetFilters={handleResetFilters}
+            viewType={viewType}
+            onViewTypeChange={handleViewTypeChange}
           />
         </div>
         

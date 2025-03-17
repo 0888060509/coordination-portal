@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -17,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useAuth } from "@/context/AuthContext";
 import bookingService, { getBooking, updateBooking } from "@/services/bookingService";
-import { getRoom } from "@/services/roomService";
+import { getRoomById } from "@/services/roomService";
 import { BookingWithDetails } from "@/types/booking";
 import { Room } from "@/types/room";
 
@@ -69,7 +68,7 @@ const EditBooking: React.FC = () => {
         setBooking(fetchedBooking);
         
         // Fetch room details
-        const fetchedRoom = await getRoom(fetchedBooking.room_id);
+        const fetchedRoom = await getRoomById(fetchedBooking.room_id);
         setRoom(fetchedRoom);
         
         // Setup form values
