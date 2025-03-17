@@ -338,6 +338,20 @@ export type Database = {
         }
         Returns: string
       }
+      find_available_time_slots: {
+        Args: {
+          room_id: string
+          date_to_check: string
+          business_start_hour?: number
+          business_end_hour?: number
+          slot_duration_minutes?: number
+        }
+        Returns: {
+          start_time: string
+          end_time: string
+          is_available: boolean
+        }[]
+      }
     }
     Enums: {
       frequency_type: "daily" | "weekly" | "monthly"

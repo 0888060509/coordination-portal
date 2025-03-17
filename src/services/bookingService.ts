@@ -1,6 +1,8 @@
+
 import { supabase, handleSupabaseError } from '@/integrations/supabase/client';
 import { Booking, BookingWithDetails, CreateBookingData } from '@/types/booking';
 import { UserProfile } from '@/types/booking';
+import { toast } from '@/hooks/use-toast';
 
 export const bookingService = {
   // Get all bookings for the current user
@@ -103,6 +105,22 @@ export const bookingService = {
   // Create a new booking
   async createBooking(bookingData: CreateBookingData): Promise<string> {
     try {
+      // Validate booking times
+      if (!this.validateBookingTimes(bookingData.start_time, bookingData.end_time)) {
+        throw new Error('Invalid booking times. Please check your start and end times.');
+      }
+
+      // Check availability before creating booking
+      const isAvailable = await this.isRoomAvailable(
+        bookingData.room_id,
+        bookingData.start_time,
+        bookingData.end_time
+      );
+
+      if (!isAvailable) {
+        throw new Error('The room is not available during the selected time period');
+      }
+
       // Use the create_booking RPC function which handles conflict checking
       const { data, error } = await supabase.rpc('create_booking', {
         p_room_id: bookingData.room_id,
@@ -117,9 +135,36 @@ export const bookingService = {
         throw error;
       }
 
+      // If we have attendees, add them to the booking
+      if (bookingData.attendees && bookingData.attendees.length > 0) {
+        await this.addAttendeesToBooking(data as string, bookingData.attendees);
+      }
+
       return data as string;
     } catch (error) {
       console.error('Error creating booking:', error);
+      throw error;
+    }
+  },
+
+  // Add attendees to a booking
+  async addAttendeesToBooking(bookingId: string, attendeeIds: string[]): Promise<void> {
+    try {
+      const attendees = attendeeIds.map(userId => ({
+        booking_id: bookingId,
+        user_id: userId,
+        status: 'invited'
+      }));
+
+      const { error } = await supabase
+        .from('booking_attendees')
+        .insert(attendees);
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error adding attendees:', error);
       throw error;
     }
   },
@@ -129,19 +174,20 @@ export const bookingService = {
     try {
       // If updating times, check availability first
       if (bookingData.start_time && bookingData.end_time) {
-        const { data: isAvailable, error: availabilityError } = await supabase.rpc(
-          'check_room_availability',
-          {
-            room_id: bookingData.room_id,
-            start_time: bookingData.start_time,
-            end_time: bookingData.end_time,
-            exclude_booking_id: id
-          }
-        );
-
-        if (availabilityError) {
-          throw availabilityError;
+        // Validate booking times
+        if (!this.validateBookingTimes(
+          new Date(bookingData.start_time), 
+          new Date(bookingData.end_time)
+        )) {
+          throw new Error('Invalid booking times. Please check your start and end times.');
         }
+
+        const isAvailable = await this.isRoomAvailable(
+          bookingData.room_id!,
+          new Date(bookingData.start_time),
+          new Date(bookingData.end_time),
+          id
+        );
 
         if (!isAvailable) {
           throw new Error('The room is not available during the selected time period');
@@ -219,9 +265,19 @@ export const bookingService = {
     }
   },
 
-  // Check availability for a room
-  async checkAvailability(roomId: string, startTime: Date, endTime: Date, excludeBookingId?: string): Promise<boolean> {
+  // Enhanced check availability for a room with better error handling
+  async checkAvailability(
+    roomId: string, 
+    startTime: Date, 
+    endTime: Date, 
+    excludeBookingId?: string
+  ): Promise<boolean> {
     try {
+      // Validate booking times first
+      if (!this.validateBookingTimes(startTime, endTime)) {
+        return false;
+      }
+
       const { data, error } = await supabase.rpc(
         'check_room_availability',
         {
@@ -233,6 +289,7 @@ export const bookingService = {
       );
 
       if (error) {
+        console.error('Error checking room availability:', error);
         throw error;
       }
 
@@ -241,6 +298,109 @@ export const bookingService = {
       console.error('Error checking room availability:', error);
       throw error;
     }
+  },
+
+  // New function: isRoomAvailable - with more comprehensive checking and fallbacks
+  async isRoomAvailable(
+    roomId: string, 
+    startTime: Date, 
+    endTime: Date, 
+    excludeBookingId?: string
+  ): Promise<boolean> {
+    try {
+      // First check if the room exists and is in 'available' status
+      const { data: roomData, error: roomError } = await supabase
+        .from('rooms')
+        .select('status')
+        .eq('id', roomId)
+        .single();
+
+      if (roomError) {
+        throw roomError;
+      }
+
+      // If room is not in available status, it's not available
+      if (roomData.status !== 'available') {
+        return false;
+      }
+
+      // Then check for booking conflicts
+      return await this.checkAvailability(roomId, startTime, endTime, excludeBookingId);
+    } catch (error) {
+      console.error('Error checking room availability:', error);
+      // Default to unavailable on error for safety
+      return false;
+    }
+  },
+
+  // New function: findAvailableTimeSlots
+  async findAvailableTimeSlots(
+    roomId: string, 
+    date: Date, 
+    startHour: number = 8, 
+    endHour: number = 18,
+    intervalMinutes: number = 60
+  ): Promise<Array<{ startTime: Date; endTime: Date; isAvailable: boolean }>> {
+    try {
+      // Format date to YYYY-MM-DD
+      const formattedDate = date.toISOString().split('T')[0];
+
+      const { data, error } = await supabase.rpc(
+        'find_available_time_slots',
+        {
+          room_id: roomId,
+          date_to_check: formattedDate,
+          business_start_hour: startHour,
+          business_end_hour: endHour,
+          slot_duration_minutes: intervalMinutes
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      // Convert the results to the required format
+      return (data || []).map(slot => ({
+        startTime: new Date(slot.start_time),
+        endTime: new Date(slot.end_time),
+        isAvailable: slot.is_available
+      }));
+    } catch (error) {
+      console.error('Error finding available time slots:', error);
+      throw error;
+    }
+  },
+
+  // New function: validateBookingTimes
+  validateBookingTimes(startTime: Date, endTime: Date): boolean {
+    // Ensure end time is after start time
+    if (startTime >= endTime) {
+      return false;
+    }
+
+    // Get business hours (8am to 6pm)
+    const businessStartHour = 8;
+    const businessEndHour = 18;
+
+    // Check if booking is within business hours
+    const startHour = startTime.getHours();
+    const endHour = endTime.getHours();
+    const endMinutes = endTime.getMinutes();
+
+    if (startHour < businessStartHour || 
+        (endHour > businessEndHour || (endHour === businessEndHour && endMinutes > 0))) {
+      return false;
+    }
+
+    // Check if booking is too short (less than 30 minutes)
+    const durationMs = endTime.getTime() - startTime.getTime();
+    const durationMinutes = durationMs / (1000 * 60);
+    if (durationMinutes < 30) {
+      return false;
+    }
+
+    return true;
   },
 
   // Get available users for attendee selection
@@ -308,6 +468,34 @@ export const bookingService = {
       console.error('Error creating recurring booking:', error);
       throw error;
     }
+  },
+
+  // Subscribe to booking changes for real-time updates
+  subscribeToBookingChanges(
+    roomId: string, 
+    callback: (payload: any) => void
+  ): { unsubscribe: () => void } {
+    const channel = supabase
+      .channel('room-bookings')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `room_id=eq.${roomId}`
+        },
+        (payload) => {
+          callback(payload);
+        }
+      )
+      .subscribe();
+
+    return {
+      unsubscribe: () => {
+        supabase.removeChannel(channel);
+      }
+    };
   }
 };
 
