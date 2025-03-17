@@ -1,32 +1,59 @@
 
 import { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { 
+  Calendar, 
+  Home, 
+  Users, 
+  DoorClosed, 
+  LayoutDashboard,
+  Shield
+} from "lucide-react";
+import { 
+  SidebarMenuItem, 
+  SidebarMenuButton 
+} from "@/components/ui/sidebar";
 
 interface NavItemProps {
-  icon: ReactNode;
+  icon: "dashboard" | "rooms" | "bookings" | "admin" | "roomManagement" | "userManagement" | "security";
   to: string;
-  expanded: boolean;
-  children?: ReactNode;
+  isActive?: boolean;
+  children: ReactNode;
+  onClick?: () => void;
 }
 
-const NavItem = ({ icon, to, expanded, children }: NavItemProps) => {
+const NavItem = ({ icon, to, children, isActive, onClick }: NavItemProps) => {
+  // Map icon names to Lucide icon components
+  const getIcon = () => {
+    switch (icon) {
+      case "dashboard":
+        return <Home className="h-5 w-5" />;
+      case "rooms":
+        return <DoorClosed className="h-5 w-5" />;
+      case "bookings":
+        return <Calendar className="h-5 w-5" />;
+      case "admin":
+        return <LayoutDashboard className="h-5 w-5" />;
+      case "roomManagement":
+        return <DoorClosed className="h-5 w-5" />;
+      case "userManagement":
+        return <Users className="h-5 w-5" />;
+      case "security":
+        return <Shield className="h-5 w-5" />;
+      default:
+        return <Home className="h-5 w-5" />;
+    }
+  };
+
   return (
-    <NavLink 
-      to={to} 
-      className={({ isActive }) => cn(
-        "flex items-center py-2 px-3 rounded-md transition-colors",
-        expanded ? "justify-start" : "justify-center",
-        isActive 
-          ? "bg-primary/10 text-primary hover:bg-primary/20" 
-          : "hover:bg-muted text-muted-foreground hover:text-foreground"
-      )}
-    >
-      <span className={cn("flex-shrink-0", expanded && "mr-3")}>
-        {icon}
-      </span>
-      {expanded && <span className="truncate">{children}</span>}
-    </NavLink>
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={isActive}>
+        <NavLink to={to} onClick={onClick}>
+          {getIcon()}
+          <span>{children}</span>
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 };
 

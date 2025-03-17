@@ -1,259 +1,224 @@
 
 /**
- * Unified Navigation Service
- * 
- * This service centralizes all navigation logic in one place to prevent
- * inconsistencies and redirect loops.
+ * A dedicated service to handle critical navigation operations
+ * This centralizes all redirection logic into a single authoritative source
  */
 
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+// Track redirection state to prevent multiple attempts
+let redirectionInProgress = false;
+let lastRedirectTime = 0;
+let redirectionCooldown = 3000; // 3 seconds cooldown between redirects
 
-// Configuration
-const REDIRECT_COOLDOWN = 2000; // 2 seconds between redirects
-const DEBUG = false; // Set to true to enable navigation debugging
-
-// Navigation state tracking
-let lastNavigationTime = 0;
-let navigationInProgress = false;
-let navigationCounter = 0;
-
-// Public routes that don't require authentication
-const PUBLIC_ROUTES = [
-  '/',
-  '/login',
-  '/register',
-  '/forgot-password',
-  '/reset-password'
-];
+// Debug flag to trace navigation issues
+const DEBUG_NAVIGATION = true;
 
 /**
- * Check if a path is a public route
+ * Force navigation to dashboard using direct window.location
+ * This bypasses React Router entirely for guaranteed navigation
  */
-export const isPublicRoute = (path: string): boolean => {
-  return PUBLIC_ROUTES.some(route => 
-    path === route || 
-    path.startsWith(`${route}/`)
-  );
-};
-
-/**
- * Log navigation events if debugging is enabled
- */
-const logNavigation = (message: string, data?: any) => {
-  if (DEBUG) {
-    if (data) {
-      console.log(`🧭 NAV: ${message}`, data);
-    } else {
-      console.log(`🧭 NAV: ${message}`);
-    }
-  }
-};
-
-/**
- * Navigate to a route using the most appropriate method
- * 
- * @param path The path to navigate to
- * @param options Navigation options
- * @returns Whether navigation was successful
- */
-export const navigateTo = (
-  path: string, 
-  options: {
-    replace?: boolean;
-    skipAuthCheck?: boolean;
-    forceReload?: boolean;
-    source?: string;
-  } = {}
-): boolean => {
-  const {
-    replace = false,
-    skipAuthCheck = false,
-    forceReload = false,
-    source = 'unknown'
-  } = options;
-
-  // Get current path from window.location
+export const forceToDashboard = (source: string = 'unknown') => {
+  const currentTime = Date.now();
   const currentPath = window.location.pathname;
   
-  // Prevent navigation to the same route
-  if (currentPath === path && !forceReload) {
-    logNavigation(`Already on ${path} (requested by ${source})`);
-    return false;
-  }
-  
-  // Prevent multiple navigations in rapid succession
-  const currentTime = Date.now();
-  if (navigationInProgress && currentTime - lastNavigationTime < REDIRECT_COOLDOWN) {
-    logNavigation(`Navigation already in progress (requested by ${source})`);
-    return false;
-  }
-  
-  // Set navigation state
-  navigationInProgress = true;
-  lastNavigationTime = currentTime;
-  navigationCounter++;
-  
-  // Create a unique ID for this navigation attempt
-  const navigationId = navigationCounter;
-  
-  logNavigation(`Navigating to ${path} (requested by ${source}, id: ${navigationId})`);
-  
-  // Use window.location for reliable navigation
-  if (forceReload) {
-    window.location.href = path;
-  } else {
-    // Use history API for smoother navigation
-    if (replace) {
-      window.history.replaceState(null, '', path);
-    } else {
-      window.history.pushState(null, '', path);
+  // Prevent potential loops by checking if we're already on dashboard
+  if (currentPath === '/dashboard') {
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Already on dashboard (requested by ${source})`);
     }
-    
-    // Dispatch a popstate event to notify React Router
-    window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+    return false;
   }
   
-  // Reset navigation flag after a delay
+  // Prevent multiple redirects in rapid succession
+  if (redirectionInProgress) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Redirection already in progress (requested by ${source})`);
+    }
+    return false;
+  }
+  
+  // Check for cooldown to prevent redirect loops
+  if (currentTime - lastRedirectTime < redirectionCooldown) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`⏱️ NAVIGATION: In cooldown period (requested by ${source}), waiting ${redirectionCooldown}ms`);
+    }
+    return false;
+  }
+  
+  // Set redirection flags
+  redirectionInProgress = true;
+  lastRedirectTime = currentTime;
+  
+  if (DEBUG_NAVIGATION) {
+    console.log(`🚀 NAVIGATION: Forcing navigation to dashboard (requested by ${source})`);
+  }
+  
+  // Store successful auth in localStorage for other components to detect
+  localStorage.setItem('auth_success', 'true');
+  localStorage.setItem('auth_timestamp', currentTime.toString());
+  
+  // Direct location change for most reliable redirection
+  if (window.location.pathname !== '/dashboard') {
+    window.location.href = '/dashboard';
+  }
+  
+  // Reset flag after a delay
   setTimeout(() => {
-    if (navigationId === navigationCounter) {
-      navigationInProgress = false;
-      logNavigation(`Navigation cooldown reset (id: ${navigationId})`);
-    }
-  }, REDIRECT_COOLDOWN);
+    redirectionInProgress = false;
+  }, redirectionCooldown);
   
   return true;
 };
 
 /**
- * Navigate to the dashboard
+ * Force navigation to login using direct window.location
+ * This bypasses React Router entirely for guaranteed navigation
  */
-export const navigateToDashboard = (options: { source?: string } = {}) => {
-  // Set auth success in localStorage
-  localStorage.setItem('auth_success', 'true');
-  localStorage.setItem('auth_timestamp', Date.now().toString());
+export const forceToLogin = (source: string = 'unknown') => {
+  const currentTime = Date.now();
+  const currentPath = window.location.pathname;
   
-  return navigateTo('/dashboard', {
-    replace: true,
-    ...options
-  });
-};
-
-/**
- * Navigate to the login page
- */
-export const navigateToLogin = (options: { source?: string } = {}) => {
-  // Clear auth data from localStorage
+  // Prevent potential loops by checking if we're already on login
+  if (currentPath === '/login') {
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Already on login (requested by ${source})`);
+    }
+    return false;
+  }
+  
+  // Prevent multiple redirects in rapid succession
+  if (redirectionInProgress) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Redirection already in progress (requested by ${source})`);
+    }
+    return false;
+  }
+  
+  // Check for cooldown to prevent redirect loops
+  if (currentTime - lastRedirectTime < redirectionCooldown) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`⏱️ NAVIGATION: In cooldown period (requested by ${source}), waiting ${redirectionCooldown}ms`);
+    }
+    return false;
+  }
+  
+  // Set redirection flags
+  redirectionInProgress = true;
+  lastRedirectTime = currentTime;
+  
+  if (DEBUG_NAVIGATION) {
+    console.log(`🚀 NAVIGATION: Forcing navigation to login (requested by ${source})`);
+  }
+  
+  // Clear auth-related localStorage
   localStorage.removeItem('auth_success');
   localStorage.removeItem('auth_timestamp');
   
-  return navigateTo('/login', {
-    replace: true,
-    ...options
-  });
+  // Direct location change for most reliable redirection
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+  
+  // Reset flag after a delay
+  setTimeout(() => {
+    redirectionInProgress = false;
+  }, redirectionCooldown);
+  
+  return true;
 };
 
 /**
- * Check authentication status and redirect if necessary
- * 
- * @returns Promise resolving to whether a redirect occurred
+ * Check if the user should be on dashboard based on auth status
+ * This is a utility function that can be called from any component
  */
-export const checkAuthAndRedirect = async (): Promise<boolean> => {
-  try {
-    // Get current session
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    
-    // Get current path
-    const currentPath = window.location.pathname;
-    
-    // Handle authenticated user
-    if (session) {
-      logNavigation('User authenticated', { path: currentPath });
-      
-      // Store auth success in localStorage
-      localStorage.setItem('auth_success', 'true');
-      localStorage.setItem('auth_timestamp', Date.now().toString());
-      
-      // If on a public route, redirect to dashboard
-      if (isPublicRoute(currentPath)) {
-        toast({
-          title: "Already signed in",
-          description: "Redirecting to dashboard",
-        });
-        
-        return navigateToDashboard({ source: 'checkAuthAndRedirect' });
-      }
-      
-      return false;
+export const checkAuthRedirect = async () => {
+  // Prevent redirect loops by adding a cooldown mechanism
+  const currentTime = Date.now();
+  if (currentTime - lastRedirectTime < redirectionCooldown) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`⏱️ NAVIGATION: checkAuthRedirect in cooldown period, skipping`);
     }
-    
-    // Handle unauthenticated user
-    logNavigation('User not authenticated', { path: currentPath });
-    
-    // Clear auth data from localStorage
-    localStorage.removeItem('auth_success');
-    localStorage.removeItem('auth_timestamp');
-    
-    // If not on a public route, redirect to login
-    if (!isPublicRoute(currentPath)) {
-      toast({
-        title: "Session expired",
-        description: "Please sign in again",
-        variant: "destructive"
-      });
-      
-      return navigateToLogin({ source: 'checkAuthAndRedirect' });
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error checking auth status:', error);
     return false;
   }
+  
+  const authSuccess = localStorage.getItem('auth_success');
+  const authTimestamp = localStorage.getItem('auth_timestamp');
+  const currentPath = window.location.pathname;
+  
+  // If we're already on the appropriate page, do nothing
+  if (
+    (authSuccess === 'true' && currentPath === '/dashboard') || 
+    (authSuccess !== 'true' && currentPath === '/login')
+  ) {
+    return false;
+  }
+  
+  // If we have a recent successful auth, redirect to dashboard
+  if (authSuccess === 'true' && authTimestamp) {
+    const timestamp = parseInt(authTimestamp, 10);
+    const fiveMinutesMs = 5 * 60 * 1000;
+    
+    if (Date.now() - timestamp < fiveMinutesMs) {
+      // If on login page, redirect to dashboard
+      if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+        return forceToDashboard('checkAuthRedirect');
+      }
+    } else {
+      // Auth is stale, clear it
+      localStorage.removeItem('auth_success');
+      localStorage.removeItem('auth_timestamp');
+    }
+  }
+  
+  return false;
 };
 
 /**
- * Set up auth state change listeners for navigation
+ * Navigate to a specific route within the application
+ * Using direct window.location for maximum reliability
  */
-export const setupAuthChangeNavigation = () => {
-  // Set up auth state change listener for navigation
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    logNavigation(`Auth state changed: ${event}`, { session: session ? 'exists' : 'none' });
-    
-    // Handle sign in
-    if (event === 'SIGNED_IN' && session) {
-      toast({
-        title: "Successfully signed in",
-        description: "Welcome to MeetingMaster!",
-      });
-      
-      navigateToDashboard({ source: 'authStateChange' });
-    }
-    
-    // Handle sign out
-    if (event === 'SIGNED_OUT') {
-      toast({
-        title: "Successfully signed out",
-        description: "You have been logged out successfully",
-      });
-      
-      navigateToLogin({ source: 'authStateChange' });
-    }
-  });
+export const navigateTo = (route: string, source: string = 'unknown') => {
+  const currentTime = Date.now();
+  const currentPath = window.location.pathname;
   
-  // Return unsubscribe function
-  return () => {
-    subscription.unsubscribe();
-  };
+  // Prevent navigation to the same route
+  if (currentPath === route) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Already on ${route} (requested by ${source})`);
+    }
+    return false;
+  }
+  
+  // Prevent multiple navigations in rapid succession
+  if (redirectionInProgress) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Navigation already in progress (requested by ${source})`);
+    }
+    return false;
+  }
+  
+  // Check for cooldown to prevent navigation loops
+  if (currentTime - lastRedirectTime < redirectionCooldown) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`⏱️ NAVIGATION: In cooldown period (requested by ${source}), waiting ${redirectionCooldown}ms`);
+    }
+    return false;
+  }
+  
+  // Set navigation flags
+  redirectionInProgress = true;
+  lastRedirectTime = currentTime;
+  
+  if (DEBUG_NAVIGATION) {
+    console.log(`🚀 NAVIGATION: Navigating to ${route} (requested by ${source})`);
+  }
+  
+  // Direct location change for reliable navigation
+  window.location.href = route;
+  
+  // Reset flag after a delay
+  setTimeout(() => {
+    redirectionInProgress = false;
+  }, redirectionCooldown);
+  
+  return true;
 };
-
-// Export a hook for React components to use
-export function useAppNavigation() {
-  return {
-    navigateTo,
-    navigateToDashboard,
-    navigateToLogin,
-    checkAuthAndRedirect
-  };
-}

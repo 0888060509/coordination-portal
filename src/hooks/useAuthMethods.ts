@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -6,7 +5,7 @@ import { supabase, handleSupabaseError, storeOAuthState, processAuthHash } from 
 import { User } from "@/types/user";
 import { Session, AuthError } from "@supabase/supabase-js";
 import { fetchProfile } from "@/utils/userTransform";
-import { navigateToDashboard } from "@/services/navigationService";
+import { forceToDashboard } from "@/services/navigationService";
 
 /**
  * Hook that provides all auth methods
@@ -95,7 +94,7 @@ export const useAuthMethods = (
       
       // Use a short delay to ensure state updates have completed
       setTimeout(() => {
-        navigateToDashboard({ source: 'login-function' });
+        forceToDashboard('login-function');
       }, 100);
       
       // Clear loading state
@@ -267,7 +266,7 @@ export const useAuthMethods = (
     }
   };
 
-  const resetPassword = async (password: string) => {
+  const resetPassword = async (token: string, password: string) => {
     try {
       setIsLoading(true);
       // In Supabase, this is typically handled by the updateUser method after the user has clicked the reset link

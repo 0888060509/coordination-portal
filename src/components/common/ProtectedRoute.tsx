@@ -1,10 +1,9 @@
-
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState, useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import { toast } from "@/hooks/use-toast";
-import { checkAuthAndRedirect, navigateToLogin } from "@/services/navigationService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -17,7 +16,16 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const [authTimeout, setAuthTimeout] = useState(false);
   const [forceRenderContent, setForceRenderContent] = useState(false);
   
-  // Log component state for debugging
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     console.log("ProtectedRoute state:", { 
       isAuthenticated, 
@@ -29,59 +37,72 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     });
   }, [isAuthenticated, isLoading, authInitialized, forceRenderContent, authTimeout, location.pathname]);
   
-  // Set timeout for loading state
   useEffect(() => {
-    let loadingTimer: NodeJS.Timeout | null = null;
-    let authTimeoutTimer: NodeJS.Timeout | null = null;
-    
-    if (isLoading) {
-      // Force render content after a reasonable wait
-      loadingTimer = setTimeout(() => {
-        console.log("ProtectedRoute: Force rendering content after timeout");
-        setForceRenderContent(true);
-      }, 3000);
-      
-      // Set auth timeout for UI feedback
-      authTimeoutTimer = setTimeout(() => {
-        console.log("ProtectedRoute: Setting auth timeout");
-        setAuthTimeout(true);
-      }, 5000);
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
     }
     
-    // Check auth on mount
-    checkAuthAndRedirect();
+    if (isLoading) {
+      loadingTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          console.log("ProtectedRoute: Force rendering content after timeout");
+          setForceRenderContent(true);
+        }
+      }, 3000);
+    }
     
     return () => {
-      if (loadingTimer) clearTimeout(loadingTimer);
-      if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
     };
   }, [isLoading]);
 
-  // Handle manual login navigation
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    
+    if (isLoading) {
+      timer = setTimeout(() => {
+        if (isMountedRef.current) {
+          console.log("ProtectedRoute: Setting auth timeout");
+          setAuthTimeout(true);
+        }
+      }, 5000);
+    }
+    
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isLoading]);
+
   const goToLogin = () => {
     console.log("ProtectedRoute: Manually navigating to login");
-    navigateToLogin({ source: 'ProtectedRoute.goToLogin' });
+    localStorage.removeItem('auth_success');
+    
+    toast({
+      title: "Going back to login",
+      description: "Please try signing in again.",
+    });
+    
+    window.location.href = '/login';
   };
 
-  // Handle non-authenticated user
   if (authInitialized && !isAuthenticated && !isLoading && !forceRenderContent) {
     console.log("ProtectedRoute: Not authenticated, redirecting to login");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Handle role requirements
   if (isAuthenticated && requiredRole === "admin" && !isAdmin) {
     console.log("ProtectedRoute: Not admin, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Show authenticated content
   if (isAuthenticated || forceRenderContent) {
     console.log("ProtectedRoute: Rendering protected content");
     return <>{children}</>;
   }
 
-  // Show loading spinner
   if (isLoading && !forceRenderContent) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
@@ -111,7 +132,6 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     );
   }
 
-  // Default fallback
   console.log("ProtectedRoute: Default case - showing children");
   return <>{children}</>;
 };

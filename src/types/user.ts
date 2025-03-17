@@ -1,34 +1,31 @@
 
-import { Session } from "@supabase/supabase-js";
-import { Profile } from "@/types/index";
-
+// User type definition
 export interface User {
   id: string;
   email: string;
+  name: string;
   firstName: string;
   lastName: string;
-  name: string; // Added name property to match usage in components
   avatarUrl?: string;
-  role: 'user' | 'admin';
+  role: "admin" | "user";
   department?: string;
   position?: string;
-  profile?: Profile;
 }
 
+// Auth context type definition
 export interface AuthContextType {
   user: User | null;
-  session: Session | null;
+  session: import("@supabase/supabase-js").Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
   authInitialized: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
-  register: (email: string, password: string, firstName: string, lastName: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ error?: import("@supabase/supabase-js").AuthError; data?: any }>;
+  loginWithGoogle: () => Promise<void>;
+  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
-  signOut: () => Promise<void>; 
-  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
-  resetPassword: (password: string) => Promise<{ success: boolean; error?: string }>;
-  updateProfile: (data: Partial<User>) => Promise<{ success: boolean; error?: string }>;
-  refreshProfile: () => Promise<boolean>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }

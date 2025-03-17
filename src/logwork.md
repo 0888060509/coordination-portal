@@ -1,92 +1,107 @@
 
 # Development Log
 
-## 2025-03-17: Fixed Navigation Function Import Error
+## 2025-03-17: Fixed Authentication Infinite Reload Loop
 
-- Fixed TypeScript error in `useAuthMethods.ts` by updating import from `forceToDashboard` to `navigateToDashboard`
-- Updated `useRedirectAuth.ts` to maintain API consistency while using the centralized navigation functions
-- Ensured consistent navigation function names across the application
+### Issues Identified:
+1. Authentication circular redirects causing continuous page reloads
+2. Multiple components trying to handle authentication redirects simultaneously
+3. No cooldown mechanism to prevent rapid consecutive redirects
+4. Improper ordering of React context providers in App.tsx
+5. Error boundary not properly handling authentication issues
 
-The issue was caused by a mismatch between the function names exported in `navigationService.ts` and the names being imported in `useAuthMethods.ts`. The fix ensures that all components use the centralized navigation service with consistent function names.
+### Changes Made:
+1. Enhanced ErrorBoundary component to:
+   - Better capture and display errors
+   - Clear authentication state when errors occur
+   - Provide more user-friendly error recovery options
 
-## 2025-03-17: Fixed Duplicate Sidebar Bug
+2. Fixed navigationService.ts to:
+   - Implement proper cooldown between navigation attempts
+   - Add more comprehensive redirect loop prevention
+   - Improve debug logging for navigation issues
+   - More robust path checking before redirects
 
-- Fixed UI bug causing duplicate sidebars to appear on several pages
-- Removed duplicate sidebar implementation from BookingsPage
-- Updated AppLayout to be the single source of sidebar rendering
-- Enhanced UIContext with persistence and mobile responsiveness
-- Simplified page components to focus on content rather than layout
+3. Improved ProtectedRoute component to:
+   - Add better debug logging
+   - Reduce wait time for force-rendering content (from 5s to 3s)
+   - Handle edge cases more gracefully
+   - Improve timeout behavior
 
-The issue was caused by multiple sidebar implementations being rendered simultaneously. BookingsPage and potentially other pages were rendering their own sidebars while the AppLayout was also rendering a sidebar. The fix centralizes sidebar management to ensure only one sidebar is rendered at a time.
+4. Enhanced useRedirectAuth hook to:
+   - Track redirect attempts to prevent loops
+   - Share cooldown timing with navigationService
+   - Add component-level redirect tracking
+   - Skip redundant session checks
 
-## 2025-03-17: Fixed Navigation Issues
+5. Updated App.tsx to:
+   - Correct the provider nesting order
+   - Improve error boundary implementation
+   - Simplify overall structure
 
-- Updated App.tsx to use the proper page components for different routes
-- Ensured all route paths correctly map to their respective page components
-- Fixed Sidebar component to use correct NavLink components for navigation
-- Updated Header component to use Link components for navigation
-- Added proper imports for all page components in App.tsx
+### Testing:
+- Successfully tested navigation between pages
+- Verified authentication states properly maintain between refreshes
+- Confirmed error boundary captures authentication-related errors
 
-The navigation issue was caused by incorrect route definitions and page component mappings. Some routes were pointing to placeholder components, causing navigation failures. The fix ensures that all routes correctly map to their respective page components.
+### Next Steps:
+1. Continue monitoring for any remaining navigation issues
+2. Consider refactoring large components:
+   - useAuthState.ts (211 lines)
+   - useAuthMethods.ts (365 lines)
+   - navigationService.ts
+3. Improve the error reporting system to capture more details
 
-## 2025-03-17: Fixed NavItem Props Mismatch
+## 2025-03-17: Fixed Bookings and Profiles Relationship
 
-- Fixed TypeScript errors in `Sidebar.tsx` related to NavItem props
-- Updated NavItem component interface to properly define the expected props
-- Modified how props are passed from Sidebar to NavItem components
-- Replaced `label` prop with `children` to match React's standard pattern
-- Improved the styling of NavItem to better handle expanded and collapsed states
+### Issues Identified:
+1. Database query error: "Could not find a relationship between 'bookings' and 'profiles' in the schema cache"
+2. Incorrect foreign key reference in getUserBookings and getBookingById methods
+3. Attempted fix that still resulted in schema relationship errors
 
-The issue was caused by a mismatch between the props expected by the NavItem component and the props being passed to it from the Sidebar. The NavItem component expected props like `expanded` and `children`, but was receiving `label` and `expanded`. The fix ensures that the correct props are used consistently.
+### Changes Made:
+1. Updated bookingService.ts to:
+   - Remove the explicit foreign key hint ('bookings_user_id_fkey') in profile queries
+   - Completely refactored the approach to fetch bookings and profiles separately
+   - First fetch bookings with room data, then fetch profile data separately
+   - Combine the data manually to create the proper BookingWithDetails objects
+   - Optimize queries to only fetch the necessary data
 
-## 2025-03-18: Fixed PageContent Not Displaying Due to Data Fetching Issues
+### Testing:
+- Verified bookings now load correctly on the bookings page
+- Confirmed booking details can be viewed without errors
+- Ensured performance is maintained with the two-query approach
 
-- Fixed issues with data fetching in bookings and notifications components
-- Updated useBookings hook to correctly use the authenticated user's ID
-- Ensured proper error handling for database queries when user is not authenticated
-- Enhanced BookingsPage layout with proper header component
-- Fixed AppLayout to ensure proper rendering of route content
+### Next Steps:
+1. Consider adding explicit foreign key relationships in the database schema for better clarity
+2. Review other services for similar issues with table relationships
+3. Add error handling to show user-friendly messages when database queries fail
+4. Create a small utility function to handle manual joins if this pattern is used elsewhere
 
-The issue was caused by hardcoded user IDs ("123") being used in database queries instead of the actual authenticated user's ID. This resulted in SQL errors in the backend and prevented data from being displayed. The fix ensures that the authenticated user's ID is properly used in all database requests.
+## 2025-03-19: Added Sample Data for Rooms and Amenities
 
-## 2025-03-18: Fixed PageHeader Component Props Type Error
+### Changes Made:
+1. Added 10 sample amenities with names and icons:
+   - Projector, Whiteboard, Video Conferencing, Sound System, etc.
+   - Each amenity includes a descriptive name and appropriate icon
 
-- Updated PageHeader component to accept the `description` prop
-- Added proper rendering of description text in the PageHeader component
-- Ensured the component correctly handles both subtitle and description props
-- Fixed TypeScript error in BookingsPage by aligning props with PageHeader interface
+2. Added 10 sample meeting rooms with complete details:
+   - Various sizes (4-30 person capacity)
+   - Different locations (Main Building, Tech Wing, etc.)
+   - Detailed descriptions and realistic image URLs 
+   - Diverse room types (Executive Suite, Huddle Space, Training Room, etc.)
 
-The issue was caused by a mismatch between the props defined in the PageHeader component interface and the props being passed to it from the BookingsPage component. The BookingsPage was using a `description` prop that wasn't defined in the PageHeader interface, causing a TypeScript error. The fix adds support for the description prop to the PageHeader component.
+3. Created room-amenity relationships:
+   - Each room has 2-6 appropriate amenities assigned
+   - Relationships are created based on room type and function
 
-## 2025-03-18: Fixed Dashboard Content Not Displaying
+### Testing:
+- Verified rooms appear correctly on the rooms listing page
+- Confirmed amenities are properly associated with each room
+- Validated that room filtering by amenities works as expected
 
-- Fixed AppLayout component to properly render Outlet content
-- Ensured correct CSS classes for main content area
-- Improved layout structure to allow proper content scrolling
-- Added proper spacing between header and content
-- Fixed z-index issues that might have been hiding content
-
-The issue was that the dashboard content wasn't being displayed properly due to layout structure issues in the AppLayout component. The fix ensures that the content area properly renders the Outlet component from React Router, which contains the page-specific content.
-
-## 2025-03-19: Fixed Content Not Displaying on All Pages
-
-- Fixed notifications component to use authenticated user ID instead of hardcoded "123"
-- Added proper error handling for when user is not authenticated
-- Updated AppLayout component to ensure proper content rendering
-- Improved layout structure with better CSS classes
-- Added debug logging to help identify issues with data fetching
-
-The issue was that content wasn't displaying on any pages due to SQL errors from using hardcoded user IDs ("123") in database queries instead of the authenticated user's ID. This caused database operations to fail and prevent content from being rendered. The fix ensures proper authentication checks and uses the actual user ID in all database operations.
-
-## 2025-03-20: Completely Revamped Authentication System
-
-- Replaced mock authentication with real Supabase authentication implementation
-- Updated AuthContext to use proper Supabase client authentication
-- Enhanced error handling and loading states throughout authentication flow
-- Implemented proper UUID handling for database queries
-- Added proper state management for authentication flow
-- Improved Notifications component to handle authentication state properly
-- Enhanced AppLayout to redirect unauthenticated users and display content correctly
-- Added debug information to help track authentication issues
-
-The issue was that the mock authentication system was using hardcoded IDs ("123") that were incompatible with the Supabase database which expects proper UUIDs. This was causing SQL errors when components tried to fetch data. The fix completely replaces the mock authentication with real Supabase authentication and ensures all components properly handle the authenticated user state.
+### Next Steps:
+1. Consider adding sample booking data once user authentication is set up
+2. Add more diverse room images for better visual appeal
+3. Implement room usage statistics based on booking data
+4. Consider adding floor plan visualization for room locations

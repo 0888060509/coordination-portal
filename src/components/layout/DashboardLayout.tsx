@@ -1,231 +1,212 @@
 
 import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { 
-  Menu, X, ChevronDown, LayoutDashboard, Calendar, 
-  Settings, LogOut, Users, BookOpen
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
-  DropdownMenuSeparator, DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import Notifications from "../notifications/Notifications";
-import { fetchUserProfile } from "@/services/profileService";
+import { cn } from "@/lib/utils";
+import {
+  Calendar,
+  DoorClosed,
+  Home,
+  LogOut,
+  Menu,
+  Settings,
+  User,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const DashboardLayout = () => {
-  const [open, setOpen] = useState(false);
-  const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Use the logout function from the context
-  const handleSignOut = async () => {
+  const handleLogout = async () => {
     await logout();
-    navigate("/login");
   };
 
-  const getInitials = () => {
-    if (!user) return "U";
-    return `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`;
+  const handleNavigation = (path: string) => {
+    setSidebarOpen(false);
+    navigate(path);
   };
+
+  const navItems = [
+    { to: "/dashboard", icon: <Home size={20} />, label: "Dashboard" },
+    { to: "/rooms", icon: <DoorClosed size={20} />, label: "Rooms" },
+    { to: "/bookings", icon: <Calendar size={20} />, label: "Bookings" },
+    { to: "/settings", icon: <Settings size={20} />, label: "Settings" },
+  ];
+
+  const userInitials = user?.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+    : "U";
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Top navigation */}
-      <header className="sticky top-0 z-30 bg-background border-b">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center">
-            <Link to="/dashboard" className="font-bold text-xl flex items-center mr-8">
-              <Calendar className="h-5 w-5 mr-2" />
-              <span>MeetingMaster</span>
-            </Link>
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+      {/* Mobile sidebar toggle */}
+      <div className="lg:hidden fixed top-4 left-4 z-50">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSidebarOpen(true)}
+          className="bg-white dark:bg-gray-800"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </div>
 
-            {/* Desktop navigation */}
-            <nav className="hidden md:flex items-center gap-6">
-              <NavLink 
-                to="/dashboard" 
-                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-              >
-                <LayoutDashboard className="h-4 w-4" />
-                <span>Dashboard</span>
-              </NavLink>
-              
-              <NavLink 
-                to="/rooms" 
-                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-              >
-                <BookOpen className="h-4 w-4" />
-                <span>Rooms</span>
-              </NavLink>
-              
-              <NavLink 
-                to="/bookings" 
-                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-              >
-                <Calendar className="h-4 w-4" />
-                <span>Bookings</span>
-              </NavLink>
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-              {isAuthenticated && isAdmin && (
-                <NavLink 
-                  to="/admin" 
-                  className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-                >
-                  <Users className="h-4 w-4" />
-                  <span>Admin</span>
-                </NavLink>
-              )}
-            </nav>
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 transform border-r border-gray-200 bg-white transition-transform duration-200 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:relative lg:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex h-16 items-center justify-between px-4">
+          <div className="flex items-center space-x-2">
+            <div className="h-8 w-8 rounded-full bg-meeting-primary flex items-center justify-center">
+              <span className="text-white font-medium text-sm">MM</span>
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              MeetingMaster
+            </h1>
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* Notifications */}
-            <Notifications />
-
-            {/* Profile menu */}
-            {isAuthenticated && user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="p-0 h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatarUrl || undefined} alt={user.firstName} />
-                      <AvatarFallback>{getInitials()}</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <div className="flex items-center justify-start gap-2 p-2">
-                    <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium">
-                        {user.firstName} {user.lastName}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/profile">Profile</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/settings">Settings</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
-            {/* Mobile navigation trigger */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="md:hidden"
-              onClick={() => setOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
-      </header>
-
-      {/* Mobile navigation */}
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="w-64">
-          <div className="flex flex-col h-full">
-            <Link to="/dashboard" className="font-bold text-xl flex items-center py-4 mb-4" onClick={() => setOpen(false)}>
-              <Calendar className="h-5 w-5 mr-2" />
-              <span>MeetingMaster</span>
-            </Link>
-            
-            <nav className="flex flex-col gap-2">
-              <NavLink 
-                to="/dashboard" 
-                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-                onClick={() => setOpen(false)}
+        <ScrollArea className="h-[calc(100vh-4rem)]">
+          <nav className="space-y-1 px-2 py-4">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-meeting-primary text-white"
+                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  )
+                }
+                onClick={() => setSidebarOpen(false)}
               >
-                <LayoutDashboard className="h-5 w-5" />
-                <span>Dashboard</span>
+                {item.icon}
+                <span>{item.label}</span>
               </NavLink>
-              
-              <NavLink 
-                to="/rooms" 
-                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-                onClick={() => setOpen(false)}
-              >
-                <BookOpen className="h-5 w-5" />
-                <span>Rooms</span>
-              </NavLink>
-              
-              <NavLink 
-                to="/bookings" 
-                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-                onClick={() => setOpen(false)}
-              >
-                <Calendar className="h-5 w-5" />
-                <span>Bookings</span>
-              </NavLink>
-
-              {isAuthenticated && isAdmin && (
-                <NavLink 
-                  to="/admin" 
-                  className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-                  onClick={() => setOpen(false)}
+            ))}
+          </nav>
+          <Separator className="my-4" />
+          <div className="px-3 py-2">
+            <div className="rounded-md bg-gray-100 p-3 dark:bg-gray-800">
+              <div className="flex items-center space-x-3">
+                <Avatar>
+                  <AvatarImage src={user?.avatarUrl} alt={user?.name || ""} />
+                  <AvatarFallback>{userInitials}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium">{user?.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {user?.email}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleNavigation("/profile")}
                 >
-                  <Users className="h-5 w-5" />
-                  <span>Admin</span>
-                </NavLink>
-              )}
-              
-              <NavLink 
-                to="/settings" 
-                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
-                onClick={() => setOpen(false)}
-              >
-                <Settings className="h-5 w-5" />
-                <span>Settings</span>
-              </NavLink>
-            </nav>
-
-            <div className="mt-auto pb-4">
-              {isAuthenticated && (
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => {
-                    handleSignOut();
-                    setOpen(false);
-                  }}
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={handleLogout}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  Logout
                 </Button>
-              )}
+              </div>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </ScrollArea>
+      </aside>
 
       {/* Main content */}
-      <main className="flex-1 container py-6">
-        <Outlet />
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t py-4">
-        <div className="container flex justify-between items-center">
-          <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} MeetingMaster. All rights reserved.
-          </p>
-          <p className="text-sm text-muted-foreground">Version 1.0.0</p>
+      <main className="flex-1 overflow-auto">
+        <div className="flex h-16 items-center justify-end border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex items-center space-x-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={user?.avatarUrl}
+                      alt={user?.name || ""}
+                    />
+                    <AvatarFallback>{userInitials}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/profile")}>
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/settings")}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </footer>
+        <div className="p-4 md:p-6 lg:p-8">
+          <Outlet />
+        </div>
+      </main>
     </div>
   );
 };

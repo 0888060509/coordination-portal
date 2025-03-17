@@ -17,25 +17,9 @@ export interface UserProfile {
   updated_at: string;
 }
 
-export interface BookingWithDetails {
-  id: string;
-  room_id: string;
-  user_id: string;
-  title: string;
-  description?: string;
-  start_time: string;
-  end_time: string;
-  status: 'confirmed' | 'cancelled' | 'completed';
-  created_at: string;
-  updated_at: string;
-  recurring_pattern_id?: string;
+export interface BookingWithDetails extends Omit<Booking, 'rooms' | 'profiles'> {
   room: Room;
   user: UserProfile;
-  attendees?: string[];
-  equipment_needed?: string[];
-  special_requests?: string;
-  meeting_type?: string;
-  cancellation_reason?: string;
 }
 
 export interface CreateBookingData {
@@ -43,22 +27,8 @@ export interface CreateBookingData {
   user_id: string;
   title: string;
   description?: string;
-  start_time: Date | string;
-  end_time: Date | string;
-  attendees?: string[];
-  meeting_type?: string;
-  equipment_needed?: string[];
-  special_requests?: string;
-  recurring_pattern_id?: string;
-  is_recurring?: boolean;
-  recurring_pattern?: {
-    frequency: 'daily' | 'weekly' | 'monthly';
-    interval: number;
-    days_of_week?: number[];
-    start_date?: string;
-    end_date?: string;
-    max_occurrences?: number;
-  };
+  start_time: Date;
+  end_time: Date;
 }
 
 export interface RecurringPattern {
@@ -70,32 +40,5 @@ export interface RecurringPattern {
   start_date: string;
   end_date?: string;
   max_occurrences?: number;
-  created_at: string;
-}
-
-export interface RecurringPatternRequest {
-  frequency: 'daily' | 'weekly' | 'monthly';
-  interval: number;
-  daysOfWeek?: number[];
-  endDate?: Date;
-  maxOccurrences?: number;
-  excludeDates?: Date[];
-}
-
-export interface RecurringBookingInstance {
-  id: string;
-  date: Date;
-  status: 'confirmed' | 'cancelled' | 'completed' | 'conflict' | 'excluded';
-}
-
-export type NotificationType = 'confirmation' | 'reminder' | 'update' | 'cancellation';
-
-export interface Notification {
-  id: string;
-  user_id: string;
-  booking_id: string;
-  type: NotificationType;
-  message: string;
-  is_read: boolean;
   created_at: string;
 }
