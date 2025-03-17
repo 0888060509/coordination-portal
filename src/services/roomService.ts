@@ -1,18 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { RoomWithAmenities, Amenity } from "@/types/room";
+import { RoomWithAmenities, Amenity, RoomFilterOptions } from "@/types/index";
 import { toast } from "@/hooks/use-toast";
-
-// Define RoomFilterOptions interface to match what's used in RoomList.tsx
-export interface RoomFilterOptions {
-  capacity?: number;
-  location?: string;
-  date?: Date;
-  startTime?: string;
-  endTime?: string;
-  amenities?: string[];
-  searchQuery?: string;
-}
 
 export const roomService = {
   // Get all rooms with optional filtering
@@ -41,6 +30,10 @@ export const roomService = {
         query = query.or(`name.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`);
       }
 
+      if (filters?.status) {
+        query = query.eq("status", filters.status);
+      }
+
       // Fetch rooms
       const { data: rooms, error } = await query;
 
@@ -66,6 +59,7 @@ export const roomService = {
           is_active: room.is_active,
           created_at: room.created_at,
           updated_at: room.updated_at,
+          status: room.status || 'available',
           amenities: amenities,
         };
 
@@ -174,6 +168,7 @@ export const roomService = {
         is_active: data.is_active,
         created_at: data.created_at,
         updated_at: data.updated_at,
+        status: data.status || 'available',
         amenities: amenities,
       };
     } catch (error) {

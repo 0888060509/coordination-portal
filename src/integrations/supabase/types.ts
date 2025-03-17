@@ -122,6 +122,44 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -280,10 +318,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_room_availability: {
+        Args: {
+          room_id: string
+          start_time: string
+          end_time: string
+          exclude_booking_id?: string
+        }
+        Returns: boolean
+      }
+      create_booking: {
+        Args: {
+          p_room_id: string
+          p_user_id: string
+          p_title: string
+          p_description: string
+          p_start_time: string
+          p_end_time: string
+        }
+        Returns: string
+      }
     }
     Enums: {
-      [_ in never]: never
+      frequency_type: "daily" | "weekly" | "monthly"
+      notification_type: "confirmation" | "reminder" | "update" | "cancellation"
     }
     CompositeTypes: {
       [_ in never]: never
