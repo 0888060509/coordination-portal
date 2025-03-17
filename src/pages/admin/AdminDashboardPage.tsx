@@ -18,13 +18,16 @@ const AdminDashboardPage = () => {
     queryKey: ["adminStats"],
     queryFn: () => adminService.getAdminStats(),
     staleTime: 5 * 60 * 1000, // 5 minutes
-    onError: (err: Error) => {
-      console.error("Error fetching admin stats:", err);
-      toast({
-        variant: "destructive",
-        title: "Error loading dashboard",
-        description: err.message || "Failed to load admin statistics",
-      });
+    retry: 1,
+    onSettled: (data, error) => {
+      if (error) {
+        console.error("Error fetching admin stats:", error);
+        toast({
+          variant: "destructive",
+          title: "Error loading dashboard",
+          description: error.message || "Failed to load admin statistics",
+        });
+      }
     },
   });
 
