@@ -268,8 +268,9 @@ export const roomService = {
 
       // Extract and transform the amenities from the nested structure
       const amenities: Amenity[] = data.map(item => {
-        // Each item.amenities is a single amenity object, not an array
-        return item.amenities as Amenity;
+        // Ensure we're properly casting the amenity object, not treating it as an array
+        const amenity = item.amenities as unknown;
+        return amenity as Amenity;
       });
       
       return amenities || [];
