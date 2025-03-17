@@ -1,3 +1,4 @@
+
 # Development Log
 
 ## 2025-03-17: Fixed Navigation Function Import Error
@@ -56,3 +57,13 @@ The issue was caused by hardcoded user IDs ("123") being used in database querie
 - Fixed TypeScript error in BookingsPage by aligning props with PageHeader interface
 
 The issue was caused by a mismatch between the props defined in the PageHeader component interface and the props being passed to it from the BookingsPage component. The BookingsPage was using a `description` prop that wasn't defined in the PageHeader interface, causing a TypeScript error. The fix adds support for the description prop to the PageHeader component.
+
+## 2025-03-18: Fixed Dashboard Content Not Displaying
+
+- Fixed AppLayout component to properly render Outlet content
+- Ensured correct CSS classes for main content area
+- Improved layout structure to allow proper content scrolling
+- Added proper spacing between header and content
+- Fixed z-index issues that might have been hiding content
+
+The issue was that the dashboard content wasn't being displayed properly due to layout structure issues in the AppLayout component. The fix ensures that the content area properly renders the Outlet component from React Router, which contains the page-specific content.
