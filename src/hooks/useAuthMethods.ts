@@ -59,12 +59,13 @@ export const useAuthMethods = (
             title: "Login successful",
             description: "Welcome back to MeetingMaster!",
           });
+          
+          // Force navigation to dashboard right after setting user data
+          navigate('/dashboard', { replace: true });
         }
-        
-        // Explicitly return successful login data
-        return { data };
       }
       
+      setIsLoading(false);
       return { data };
     } catch (error) {
       console.error("Unexpected login error:", error);

@@ -34,7 +34,6 @@ const LoginPage = () => {
   const [processingOAuth, setProcessingOAuth] = useState(false);
   const [initialAuthCheck, setInitialAuthCheck] = useState(true);
   const [loginAttempts, setLoginAttempts] = useState(0);
-  const [forcingNavigation, setForcingNavigation] = useState(false);
 
   const from = location.state?.from?.pathname || "/dashboard";
 
@@ -53,13 +52,11 @@ const LoginPage = () => {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && !processingOAuth) {
+    if (isAuthenticated && !processingOAuth && !isSubmitting) {
       console.log("User authenticated, navigating to dashboard");
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 500);
+      navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, processingOAuth, navigate]);
+  }, [isAuthenticated, processingOAuth, navigate, isSubmitting]);
 
   useEffect(() => {
     let loginTimeout: NodeJS.Timeout;
@@ -186,18 +183,7 @@ const LoginPage = () => {
         throw result.error;
       }
       
-      console.log("Login successful, session created");
-      toast({
-        title: "Success",
-        description: "Logged in successfully",
-      });
-      
-      setIsSubmitting(false);
-      
-      setTimeout(() => {
-        console.log("Forcing navigation to dashboard after login");
-        navigate('/dashboard', { replace: true });
-      }, 500);
+      console.log("Login successful, waiting for redirect");
     } catch (error) {
       console.error("Login failed:", error);
       

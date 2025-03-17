@@ -72,10 +72,21 @@ export const useAuthState = ({
             setIsAdmin(false);
           }
           setIsLoading(false);
+          
+          // Explicitly navigate to dashboard for SIGNED_IN events
+          if (event === 'SIGNED_IN') {
+            console.log("Auth event SIGNED_IN, navigating to dashboard");
+            navigate('/dashboard', { replace: true });
+          }
         } else {
           setUser(null);
           setIsAdmin(false);
           setIsLoading(false);
+          
+          // Handle signed out event
+          if (event === 'SIGNED_OUT') {
+            navigate('/login');
+          }
         }
         
         // Handle specific auth events with improved navigation
@@ -84,15 +95,6 @@ export const useAuthState = ({
             title: "Successfully signed in",
             description: "Welcome to MeetingMaster!",
           });
-          
-          // Force navigation with delay to ensure state is updated
-          setTimeout(() => {
-            const currentPath = window.location.pathname;
-            if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
-              console.log("Signed in, navigating to dashboard");
-              navigate('/dashboard', { replace: true });
-            }
-          }, 500);
         }
         
         if (event === 'SIGNED_OUT') {
