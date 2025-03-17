@@ -11,13 +11,28 @@ export interface DashboardStats {
   upcomingBookings: number;
   completedBookings: number;
   cancelledBookings: number;
+  todayBookings: number;
+  favoriteRoom?: {
+    id: string;
+    name: string;
+    bookingCount: number;
+  };
   mostBookedRoom?: {
     id: string;
     name: string;
     bookings: number;
   };
+  bookingDuration: {
+    average: number;
+    longest: number;
+    shortest: number;
+  };
   bookingsByWeekday: {
     day: string;
+    count: number;
+  }[];
+  bookingsByMonth: {
+    month: string;
     count: number;
   }[];
   bookingsByStatus: {
@@ -63,7 +78,7 @@ export const getBookingStats = async (userId: string): Promise<DashboardStats> =
     // Get bookings by weekday
     const { data: bookings, error: bookingsError } = await supabase
       .from('bookings')
-      .select('start_time')
+      .select('start_time, end_time')
       .eq('user_id', userId);
 
     if (bookingsError) {
@@ -75,11 +90,61 @@ export const getBookingStats = async (userId: string): Promise<DashboardStats> =
     const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const bookingsByWeekday = weekdays.map(day => ({ day, count: 0 }));
 
+    // Process bookings by month
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const bookingsByMonth = months.map(month => ({ month, count: 0 }));
+
+    // Calculate today's bookings
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    let todayBookingsCount = 0;
+    
+    // Calculate booking durations
+    let totalDuration = 0;
+    let longestDuration = 0;
+    let shortestDuration = Infinity;
+    
     bookings?.forEach(booking => {
-      const date = new Date(booking.start_time);
-      const weekday = date.getDay();
+      const startDate = new Date(booking.start_time);
+      const endDate = new Date(booking.end_time);
+      
+      // Check if booking is today
+      if (startDate >= today && startDate < tomorrow) {
+        todayBookingsCount++;
+      }
+      
+      // Add to weekday stats
+      const weekday = startDate.getDay();
       bookingsByWeekday[weekday].count++;
+      
+      // Add to month stats
+      const month = startDate.getMonth();
+      bookingsByMonth[month].count++;
+      
+      // Calculate duration in minutes
+      const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+      totalDuration += durationMinutes;
+      
+      if (durationMinutes > longestDuration) {
+        longestDuration = durationMinutes;
+      }
+      
+      if (durationMinutes < shortestDuration) {
+        shortestDuration = durationMinutes;
+      }
     });
+    
+    const averageDuration = bookings && bookings.length > 0 
+      ? Math.round(totalDuration / bookings.length) 
+      : 0;
+    
+    // If no bookings, set shortest to 0
+    if (shortestDuration === Infinity) {
+      shortestDuration = 0;
+    }
 
     // Get most booked room
     const { data: roomBookings, error: roomError } = await supabase
@@ -126,8 +191,16 @@ export const getBookingStats = async (userId: string): Promise<DashboardStats> =
       upcomingBookings: confirmed,
       completedBookings: completed,
       cancelledBookings: cancelled,
+      todayBookings: todayBookingsCount,
+      favoriteRoom: mostBookedRoom,
       mostBookedRoom,
+      bookingDuration: {
+        average: averageDuration,
+        longest: Math.round(longestDuration),
+        shortest: Math.round(shortestDuration)
+      },
       bookingsByWeekday,
+      bookingsByMonth,
       bookingsByStatus: [
         { status: 'Confirmed', count: confirmed },
         { status: 'Completed', count: completed },
@@ -142,7 +215,14 @@ export const getBookingStats = async (userId: string): Promise<DashboardStats> =
       upcomingBookings: 0,
       completedBookings: 0,
       cancelledBookings: 0,
+      todayBookings: 0,
+      bookingDuration: {
+        average: 0,
+        longest: 0,
+        shortest: 0
+      },
       bookingsByWeekday: [],
+      bookingsByMonth: [],
       bookingsByStatus: []
     };
   }
@@ -287,7 +367,14 @@ export const getDashboardStats = async (userId: string): Promise<DashboardData> 
         upcomingBookings: 0,
         completedBookings: 0,
         cancelledBookings: 0,
+        todayBookings: 0,
+        bookingDuration: {
+          average: 0,
+          longest: 0,
+          shortest: 0
+        },
         bookingsByWeekday: [],
+        bookingsByMonth: [],
         bookingsByStatus: []
       },
       upcomingBookings: [],
