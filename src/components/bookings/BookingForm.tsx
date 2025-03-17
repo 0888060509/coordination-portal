@@ -9,11 +9,13 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { RoomWithAmenities } from "@/types/room";
-import { CreateBookingData } from "@/types/booking";
+import { BookingWithDetails, CreateBookingData } from "@/types/booking";
 import bookingService from "@/services/bookingService";
+import notificationService from "@/services/notificationService";
 import MeetingDetailsForm from "./MeetingDetailsForm";
 import AttendeesForm from "./AttendeesForm";
 import BookingReview from "./BookingReview";
+import BookingConfirmation from "./BookingConfirmation";
 import { parseTimeString } from "@/utils/formatUtils";
 
 interface BookingFormProps {
@@ -67,6 +69,8 @@ const BookingForm: React.FC<BookingFormProps> = ({
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingComplete, setBookingComplete] = useState(false);
+  const [createdBooking, setCreatedBooking] = useState<BookingWithDetails | null>(null);
   
   // Initialize the form with react-hook-form and zod resolver
   const form = useForm<BookingFormValues>({
@@ -140,15 +144,18 @@ const BookingForm: React.FC<BookingFormProps> = ({
       };
       
       // Create booking
-      await bookingService.createBooking(bookingData);
+      const bookingId = await bookingService.createBooking(bookingData);
       
-      toast({
-        title: "Booking successful",
-        description: `You have successfully booked ${room.name}`,
-      });
+      // Fetch the created booking with details
+      const bookingDetails = await bookingService.getBookingById(bookingId);
       
-      if (onSuccess) {
-        onSuccess();
+      if (bookingDetails) {
+        // Send booking confirmation notification
+        await notificationService.sendBookingConfirmation(bookingId);
+        
+        // Set created booking and mark as complete
+        setCreatedBooking(bookingDetails);
+        setBookingComplete(true);
       }
     } catch (error: any) {
       toast({
@@ -160,6 +167,16 @@ const BookingForm: React.FC<BookingFormProps> = ({
       setIsSubmitting(false);
     }
   };
+  
+  // Render the confirmation screen if booking is complete
+  if (bookingComplete && createdBooking) {
+    return (
+      <BookingConfirmation 
+        booking={createdBooking} 
+        onClose={onSuccess}
+      />
+    );
+  }
   
   // Render current step form
   const renderStep = () => {

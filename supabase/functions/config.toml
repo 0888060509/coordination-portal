@@ -1,0 +1,8 @@
+
+# The project ID of the Supabase project
+project_id = "wdooqruganwbzukglerv"
+
+# CORS settings for the functions
+[functions.cors]
+allowed_origins = ["*"]
+allowed_headers = ["authorization", "x-client-info", "apikey", "content-type", "x-client-info"]

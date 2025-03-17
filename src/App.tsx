@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/common/ProtectedRoute";
 import AdminRoute from "./components/common/AdminRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import ErrorBoundary from "./components/common/ErrorBoundary";
+import Notifications from "./components/notifications/Notifications";
 
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";

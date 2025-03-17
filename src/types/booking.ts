@@ -47,3 +47,15 @@ export interface RecurringPattern {
   max_occurrences?: number;
   created_at: string;
 }
+
+export type NotificationType = 'confirmation' | 'reminder' | 'update' | 'cancellation';
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  booking_id: string;
+  type: NotificationType;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
