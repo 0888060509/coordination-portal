@@ -1,10 +1,11 @@
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { Session } from "@supabase/supabase-js";
 import { User, AuthContextType } from "@/types/user";
 import { useAuthMethods } from "@/hooks/useAuthMethods";
 import { useOAuthCallback } from "@/hooks/useOAuthCallback";
 import { useAuthState } from "@/hooks/useAuthState";
+import { useRedirectAuth } from "@/hooks/useRedirectAuth";
 
 // Initial context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +33,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsAdmin
   });
 
+  // Use our reliable redirect hook for navigation
+  const { forceToDashboard, forceToLogin } = useRedirectAuth();
+
   // Get auth methods
   const {
     login,
@@ -50,6 +54,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     session
   );
+
+  // Listen for login-success custom event
+  useEffect(() => {
+    const handleLoginSuccess = () => {
+      console.log("AuthContext: Detected login-success event");
+      forceToDashboard();
+    };
+    
+    window.addEventListener('login-success', handleLoginSuccess);
+    
+    return () => {
+      window.removeEventListener('login-success', handleLoginSuccess);
+    };
+  }, [forceToDashboard]);
 
   const value: AuthContextType = {
     user,

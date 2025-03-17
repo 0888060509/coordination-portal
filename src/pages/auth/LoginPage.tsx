@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { processAuthHash, supabase } from "@/integrations/supabase/client";
+import { useRedirectAuth } from "@/hooks/useRedirectAuth";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -32,154 +33,9 @@ const LoginPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [processingOAuth, setProcessingOAuth] = useState(false);
-  const [initialAuthCheck, setInitialAuthCheck] = useState(true);
-  const [loginAttempts, setLoginAttempts] = useState(0);
   
-  const navigationAttemptedRef = useRef(false);
-  const authCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const loginTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const redirectCountdownRef = useRef<NodeJS.Timeout[]>([]);
+  const { forceToDashboard } = useRedirectAuth();
   
-  // Check localStorage on page load for authentication success
-  useEffect(() => {
-    const authSuccess = localStorage.getItem('auth_success');
-    const authTimestamp = localStorage.getItem('auth_timestamp');
-    
-    // If auth success is recorded within the last 5 minutes, redirect
-    if (authSuccess === 'true' && authTimestamp) {
-      const timestamp = parseInt(authTimestamp, 10);
-      const now = Date.now();
-      const fiveMinutesMs = 5 * 60 * 1000;
-      
-      if (now - timestamp < fiveMinutesMs) {
-        console.log("Found recent auth success in localStorage, redirecting");
-        navigate('/dashboard', { replace: true });
-        
-        // Clean up after redirect
-        setTimeout(() => {
-          localStorage.removeItem('auth_success');
-          localStorage.removeItem('auth_timestamp');
-        }, 1000);
-      } else {
-        // Clear stale auth success
-        localStorage.removeItem('auth_success');
-        localStorage.removeItem('auth_timestamp');
-      }
-    }
-  }, [navigate]);
-
-  // Clean up all intervals and timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (authCheckIntervalRef.current) clearInterval(authCheckIntervalRef.current);
-      if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
-      redirectCountdownRef.current.forEach(timeout => clearTimeout(timeout));
-      setIsSubmitting(false);
-    };
-  }, []);
-
-  // Initial auth check delay
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setInitialAuthCheck(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Continuous session check
-  useEffect(() => {
-    if (!navigationAttemptedRef.current) {
-      authCheckIntervalRef.current = setInterval(async () => {
-        try {
-          console.log("Performing direct session check");
-          const { data } = await supabase.auth.getSession();
-          
-          if (data.session) {
-            console.log("Session found in direct check, navigating");
-            clearInterval(authCheckIntervalRef.current!);
-            forceNavigateToDashboard();
-          }
-        } catch (error) {
-          console.error("Error checking session:", error);
-        }
-      }, 1000);
-    }
-
-    return () => {
-      if (authCheckIntervalRef.current) {
-        clearInterval(authCheckIntervalRef.current);
-      }
-    };
-  }, []);
-
-  // Detect authentication state changes
-  useEffect(() => {
-    if (isAuthenticated && !processingOAuth && !navigationAttemptedRef.current) {
-      console.log("User authenticated, navigating");
-      forceNavigateToDashboard();
-    }
-  }, [isAuthenticated, processingOAuth]);
-
-  // Handle OAuth redirects
-  useEffect(() => {
-    if (location.hash) {
-      console.log("Detected hash in URL:", location.hash.substring(0, 30) + "...");
-      
-      const processAuth = async () => {
-        try {
-          setProcessingOAuth(true);
-          setAuthError(null);
-          console.log("Processing OAuth hash");
-          
-          // Clear hash from URL
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-          }
-
-          const session = await processAuthHash();
-          
-          if (session) {
-            console.log("OAuth processing successful");
-            toast({
-              title: "Successfully signed in",
-              description: "Welcome to MeetingMaster!",
-            });
-            
-            // Set success indicator
-            localStorage.setItem('auth_success', 'true');
-            localStorage.setItem('auth_timestamp', Date.now().toString());
-            
-            // Immediate navigation
-            forceNavigateToDashboard();
-          } else {
-            console.error("Failed to process OAuth hash");
-            setProcessingOAuth(false);
-            setAuthError("Failed to complete authentication. Please try again.");
-            
-            toast({
-              variant: "destructive",
-              title: "Authentication failed",
-              description: "Could not complete the sign-in process. Please try again.",
-            });
-          }
-        } catch (error) {
-          console.error("Error processing OAuth:", error);
-          setAuthError("Failed to complete authentication. Please try again.");
-          setProcessingOAuth(false);
-          
-          toast({
-            variant: "destructive",
-            title: "Authentication error",
-            description: "An unexpected error occurred during sign-in.",
-          });
-        }
-      };
-
-      processAuth();
-    }
-  }, [location.hash]);
-
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -188,70 +44,73 @@ const LoginPage = () => {
     },
   });
 
-  const forceNavigateToDashboard = () => {
-    console.log("Forcing navigation to dashboard with multiple methods");
-    navigationAttemptedRef.current = true;
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        console.log("💡 LoginPage: User already authenticated, redirecting");
+        forceToDashboard();
+      }
+    };
     
-    // Method 1: React Router
-    navigate('/dashboard', { replace: true });
-    
-    // Add multiple fallback methods with increasing delays
-    const timeouts = [
-      setTimeout(() => {
-        console.log("Navigation fallback 1");
-        window.location.href = '/dashboard';
-      }, 500),
+    checkAuth();
+  }, [forceToDashboard]);
+
+  useEffect(() => {
+    if (location.hash && location.hash.includes('access_token')) {
+      console.log("💡 LoginPage: Detected OAuth hash, processing");
+      setProcessingOAuth(true);
       
-      setTimeout(() => {
-        console.log("Navigation fallback 2");
-        window.location.replace('/dashboard');
-      }, 1000),
+      const processHash = async () => {
+        try {
+          const session = await processAuthHash();
+          
+          if (session) {
+            console.log("💡 LoginPage: OAuth hash processed successfully");
+            localStorage.setItem('auth_success', 'true');
+            localStorage.setItem('auth_timestamp', Date.now().toString());
+            
+            toast({
+              title: "Successfully signed in",
+              description: "Welcome to MeetingMaster!",
+            });
+            
+            forceToDashboard();
+          } else {
+            console.error("💡 LoginPage: Failed to process OAuth hash");
+            setAuthError("Failed to complete authentication. Please try again.");
+            setProcessingOAuth(false);
+          }
+        } catch (error) {
+          console.error("💡 LoginPage: Error processing OAuth hash:", error);
+          setAuthError("Failed to complete authentication. Please try again.");
+          setProcessingOAuth(false);
+        }
+      };
       
-      setTimeout(() => {
-        console.log("Navigation fallback 3 - final attempt");
-        window.location.href = `${window.location.origin}/dashboard`;
-      }, 2000)
-    ];
-    
-    // Store timeouts for cleanup
-    redirectCountdownRef.current = timeouts;
-  };
+      processHash();
+    }
+  }, [location.hash, forceToDashboard]);
 
   const onSubmit = async (data: FormValues) => {
     if (isSubmitting) return;
     
     setIsSubmitting(true);
     setAuthError(null);
-    setLoginAttempts(prev => prev + 1);
-    navigationAttemptedRef.current = false;
     
     try {
-      console.log("Attempting login with email:", data.email);
+      console.log("💡 LoginPage: Attempting login with email:", data.email);
       const result = await login(data.email, data.password);
       
       if (result.error) {
+        setIsSubmitting(false);
         throw result.error;
       }
       
-      // Login has its own navigation handling, but add an extra verification
-      setTimeout(async () => {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session) {
-          console.log("Session verified after login");
-          // No need to navigate here as it's handled in login
-          
-          // Check if we're still on the login page after 2 seconds
-          setTimeout(() => {
-            if (window.location.pathname.includes('login')) {
-              console.log("Still on login page after successful login, forcing redirect");
-              window.location.href = '/dashboard';
-            }
-          }, 2000);
-        }
-      }, 1000);
+      console.log("💡 LoginPage: Login successful, navigation handled by redirect hook");
       
     } catch (error) {
-      console.error("Login failed:", error);
+      console.error("💡 LoginPage: Login failed:", error);
       setIsSubmitting(false);
       
       setAuthError(
@@ -259,14 +118,6 @@ const LoginPage = () => {
         error instanceof Error ? error.message : 
         "Invalid email or password. Please try again."
       );
-      
-      toast({
-        variant: "destructive",
-        title: "Login failed",
-        description: typeof error === 'string' ? error : 
-          error instanceof Error ? error.message : 
-          "Invalid email or password. Please try again.",
-      });
     }
   };
 
@@ -275,7 +126,7 @@ const LoginPage = () => {
 
     setAuthError(null);
     try {
-      console.log("Initiating Google login");
+      console.log("💡 LoginPage: Initiating Google login");
       
       toast({
         title: "Redirecting to Google",
@@ -284,65 +135,32 @@ const LoginPage = () => {
       
       await loginWithGoogle();
     } catch (error) {
-      console.error("Google login failed:", error);
+      console.error("💡 LoginPage: Google login failed:", error);
       setAuthError("Google login failed. Please try again.");
     }
   };
 
-  const handleResetSubmission = () => {
-    setIsSubmitting(false);
-    setAuthError("Login attempt was reset. Please try again.");
-    
-    if (loginTimeoutRef.current) {
-      clearTimeout(loginTimeoutRef.current);
-    }
-    
-    redirectCountdownRef.current.forEach(timeout => clearTimeout(timeout));
-    redirectCountdownRef.current = [];
-  };
+  if (isAuthenticated && !processingOAuth) {
+    console.log("💡 LoginPage: User is authenticated, redirecting");
+    forceToDashboard();
+    return null;
+  }
 
-  const handleForceLogin = async () => {
-    if (isSubmitting) return;
-    
-    try {
-      setIsSubmitting(true);
-      setAuthError(null);
-      
-      const { data } = await supabase.auth.refreshSession();
-      
-      if (data.session) {
-        console.log("Session refreshed successfully");
-        
-        // Set success indicator
-        localStorage.setItem('auth_success', 'true');
-        localStorage.setItem('auth_timestamp', Date.now().toString());
-        
-        toast({
-          title: "Session refreshed",
-          description: "You have been signed in successfully.",
-        });
-        
-        forceNavigateToDashboard();
-        return;
-      }
-      
-      setIsSubmitting(false);
-      setAuthError("Unable to refresh session. Please try logging in again.");
-    } catch (error) {
-      console.error("Force login error:", error);
-      setIsSubmitting(false);
-      setAuthError("Force login failed. Please try logging in normally.");
-    }
-  };
+  if (processingOAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-meeting-primary" />
+          <h2 className="mt-4 text-xl font-semibold">
+            Completing authentication...
+          </h2>
+          <p className="mt-2 text-gray-500">Please wait while we sign you in.</p>
+        </div>
+      </div>
+    );
+  }
 
-  const handleDirectNavigation = () => {
-    console.log("Attempting direct navigation to dashboard");
-    window.location.href = '/dashboard';
-  };
-
-  const showLoadingState = (authLoading && initialAuthCheck) || processingOAuth;
-
-  if (isSubmitting && loginAttempts > 0) {
+  if (isSubmitting) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md max-w-md w-full">
@@ -353,57 +171,6 @@ const LoginPage = () => {
           <p className="mt-2 text-gray-500">
             We're processing your login request. This may take a few moments.
           </p>
-          <div className="mt-6">
-            <Button 
-              variant="link" 
-              className="text-sm text-gray-500" 
-              onClick={handleResetSubmission}
-            >
-              Cancel and try again
-            </Button>
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-500 mb-2">
-              Having trouble signing in?
-            </p>
-            <div className="flex flex-col gap-2">
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={handleForceLogin}
-              >
-                Force Session Refresh
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={handleDirectNavigation}
-              >
-                Go Directly to Dashboard
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (showLoadingState) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <Loader2 className="mx-auto h-12 w-12 animate-spin text-meeting-primary" />
-          <h2 className="mt-4 text-xl font-semibold">
-            {processingOAuth ? "Completing authentication..." : "Loading..."}
-          </h2>
-          <p className="mt-2 text-gray-500">Please wait while we sign you in.</p>
-          <Button 
-            variant="link" 
-            className="mt-4 text-sm text-gray-500" 
-            onClick={() => window.location.href = '/login'}
-          >
-            Taking too long? Click here to restart
-          </Button>
         </div>
       </div>
     );
@@ -476,19 +243,6 @@ const LoginPage = () => {
             {authError && (
               <div className="mb-6 p-3 bg-red-100 text-red-700 rounded-md">
                 {authError}
-              </div>
-            )}
-
-            {isSubmitting && loginAttempts > 1 && (
-              <div className="mb-6 p-3 bg-yellow-100 text-yellow-700 rounded-md flex flex-col">
-                <span>Sign-in is taking longer than expected...</span>
-                <Button 
-                  variant="link" 
-                  className="self-end text-sm text-yellow-700 underline" 
-                  onClick={handleResetSubmission}
-                >
-                  Cancel and try again
-                </Button>
               </div>
             )}
 
@@ -578,7 +332,7 @@ const LoginPage = () => {
                   variant="outline"
                   className="w-full"
                   onClick={handleGoogleLogin}
-                  disabled={isSubmitting || processingOAuth}
+                  disabled={isSubmitting}
                 >
                   <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
                     <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">

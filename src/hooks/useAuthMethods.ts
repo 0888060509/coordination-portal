@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -24,7 +23,7 @@ export const useAuthMethods = (
     let loginError: AuthError | undefined;
     
     try {
-      console.log("Attempting hardcoded login for email:", email);
+      console.log("🔑 Login: Attempting login for email:", email);
       setIsLoading(true);
       
       // STEP 1: Core authentication operation
@@ -34,7 +33,7 @@ export const useAuthMethods = (
       });
       
       if (error) {
-        console.error("Login error from Supabase:", error);
+        console.error("🔑 Login: Error from Supabase:", error);
         loginError = error;
         
         toast({
@@ -49,7 +48,7 @@ export const useAuthMethods = (
       
       if (!data.session || !data.user) {
         const errMsg = "Login succeeded but no session or user was returned";
-        console.error(errMsg);
+        console.error("🔑 Login: " + errMsg);
         
         toast({
           variant: "destructive",
@@ -61,25 +60,27 @@ export const useAuthMethods = (
         return { error: { message: errMsg } as AuthError };
       }
       
-      console.log("Login successful, session created:", data.session.user.id);
+      console.log("🔑 Login: Successful, user ID:", data.user.id);
       
-      // STEP 2: Store success indicator in localStorage
+      // STEP 2: Mark successful login globally
+      // This will be detected by useRedirectAuth hook
       localStorage.setItem('auth_success', 'true');
       localStorage.setItem('auth_timestamp', Date.now().toString());
+      localStorage.setItem('login_redirect_pending', 'true');
       
       // STEP 3: Set session and user data synchronously
       setSession(data.session);
       
-      // STEP 4: Try to get user profile data
+      // STEP 4: Try to get user profile data 
       try {
         const userData = await fetchProfile(data.user.id, data.session);
         if (userData) {
-          console.log("User profile fetched successfully");
+          console.log("🔑 Login: User profile fetched successfully");
           setUser(userData);
           setIsAdmin(userData.role === 'admin');
         }
       } catch (profileError) {
-        console.error("Error fetching user profile:", profileError);
+        console.error("🔑 Login: Error fetching user profile:", profileError);
         // Continue with login even if profile fetch fails
       }
       
@@ -89,24 +90,15 @@ export const useAuthMethods = (
         description: "Welcome back to MeetingMaster!",
       });
       
-      // STEP 6: HARDCODED NAVIGATION USING MULTIPLE METHODS
-      console.log("FORCING NAVIGATION TO DASHBOARD USING MULTIPLE METHODS");
+      // New approach: Dispatch a custom event that will be caught by all relevant components
+      console.log("🔑 Login: Dispatching login-success event");
+      window.dispatchEvent(new CustomEvent('login-success', { 
+        detail: { userId: data.user.id }
+      }));
       
-      // Method 1: React Router navigate
+      // STEP 6: SIMPLE NAVIGATION - let the useRedirectAuth hook handle the redirection
+      // Just navigate once and let the other hook handle fallbacks
       navigate('/dashboard', { replace: true });
-      console.log("Navigation method 1 executed");
-      
-      // Method 2: Direct window location change (with delay)
-      setTimeout(() => {
-        console.log("Executing navigation method 2");
-        window.location.href = '/dashboard';
-      }, 500);
-      
-      // Method 3: Final fallback (with longer delay)
-      setTimeout(() => {
-        console.log("Executing navigation method 3");
-        window.location.replace('/dashboard');
-      }, 1500);
       
       // Clear loading state
       setTimeout(() => {
@@ -115,7 +107,7 @@ export const useAuthMethods = (
       
       return { data };
     } catch (error) {
-      console.error("Unexpected login error:", error);
+      console.error("🔑 Login: Unexpected error:", error);
       
       toast({
         variant: "destructive",
