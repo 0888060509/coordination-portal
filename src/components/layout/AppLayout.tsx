@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useUIContext } from '@/context/UIContext';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 const AppLayout = () => {
   const { state: uiState } = useUIContext();
