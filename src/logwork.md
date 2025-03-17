@@ -68,3 +68,9 @@
   - NotFoundPage for 404 errors
 - Converted Chakra UI components to use Tailwind CSS and shadcn/ui
 - Implemented responsive layouts for all new pages
+
+## 2023-08-22
+- Fixed import errors in DashboardPage.tsx
+- Created useBookings hook to fetch user bookings
+- Updated import statements for RoomCard and BookingsList components
+- Fixed type errors related to named exports vs default exports

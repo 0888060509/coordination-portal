@@ -21,8 +21,8 @@ import PageHeader from '@/components/common/PageHeader';
 import { useBookings } from '@/hooks/useBookings';
 import { useRooms } from '@/hooks/useRooms';
 import { formatDate } from '@/utils/dateUtils';
-import { RoomCard } from '@/components/rooms/RoomCard';
-import { BookingList } from '@/components/bookings/BookingsList';
+import RoomCard from '@/components/rooms/RoomCard';
+import BookingsList from '@/components/bookings/BookingsList';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
