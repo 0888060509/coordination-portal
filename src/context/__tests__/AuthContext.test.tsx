@@ -5,6 +5,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import '@testing-library/jest-dom'; // Import jest-dom matchers
 
 // Mock dependencies
 vi.mock('@/integrations/supabase/client', () => ({
