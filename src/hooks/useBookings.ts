@@ -2,10 +2,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { BookingWithDetails } from '@/types';
 import { getUserBookings } from '@/services/bookingService';
-import { useAuthState } from './useAuthState';
+import { useAuth } from '@/context/AuthContext';
 
 export const useBookings = () => {
-  const { user } = useAuthState();
+  const { user } = useAuth();
   
   return useQuery({
     queryKey: ['bookings', 'user', user?.id],

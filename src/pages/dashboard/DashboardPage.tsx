@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -169,12 +168,20 @@ export default function DashboardPage() {
               </CardHeader>
               <Separator />
               <CardContent className="pt-4">
-                <BookingsList
-                  bookings={upcomingBookings}
-                  isLoading={isLoadingBookings}
-                  emptyStateMessage="You have no upcoming bookings"
-                  onViewDetails={(booking) => navigate(`/bookings/${booking.id}`)}
-                />
+                {isLoadingBookings ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-8 h-8 border-t-2 border-b-2 border-gray-900 rounded-full animate-spin dark:border-gray-50"></div>
+                  </div>
+                ) : upcomingBookings.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground">
+                    You have no upcoming bookings
+                  </div>
+                ) : (
+                  <BookingsList
+                    bookings={upcomingBookings}
+                    onViewDetails={(booking) => navigate(`/bookings/${booking.id}`)}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>
