@@ -26,28 +26,43 @@ export const useAuthState = ({
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log("Initial auth check starting");
         setIsLoading(true);
         
         // Get current session
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         
+        console.log("Initial session check:", session ? `Session found for ${session.user.id}` : "No session found");
+        
         if (session?.user) {
           const userData = await fetchProfile(session.user.id, session);
           if (userData) {
+            console.log("Initial profile loaded successfully");
             setUser(userData);
             setIsAdmin(userData.role === 'admin');
+            
+            // Force navigation for already logged in users
+            const currentPath = window.location.pathname;
+            if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+              console.log("User already logged in, redirecting to dashboard");
+              setTimeout(() => {
+                navigate('/dashboard', { replace: true });
+              }, 100);
+            }
           } else {
+            console.warn("Initial profile fetch failed");
             setUser(null);
             setIsAdmin(false);
           }
         } else {
+          console.log("No initial session found");
           setUser(null);
           setIsAdmin(false);
         }
         setIsLoading(false);
       } catch (error) {
-        console.error("Auth check error:", error);
+        console.error("Initial auth check error:", error);
         setIsLoading(false);
       }
     };
@@ -58,16 +73,24 @@ export const useAuthState = ({
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("Auth state changed:", event, session ? "Session exists" : "No session");
+        console.log("Auth state changed:", event, session ? `Session exists for ${session.user.id}` : "No session");
         setSession(session);
         
         if (session?.user) {
           setIsLoading(true);
-          const userData = await fetchProfile(session.user.id, session);
-          if (userData) {
-            setUser(userData);
-            setIsAdmin(userData.role === 'admin');
-          } else {
+          try {
+            const userData = await fetchProfile(session.user.id, session);
+            if (userData) {
+              console.log("Profile loaded after auth state change");
+              setUser(userData);
+              setIsAdmin(userData.role === 'admin');
+            } else {
+              console.warn("Profile fetch failed after auth state change");
+              setUser(null);
+              setIsAdmin(false);
+            }
+          } catch (error) {
+            console.error("Error fetching profile after auth state change:", error);
             setUser(null);
             setIsAdmin(false);
           }
@@ -76,9 +99,22 @@ export const useAuthState = ({
           // Explicitly navigate to dashboard for SIGNED_IN events
           if (event === 'SIGNED_IN') {
             console.log("Auth event SIGNED_IN, navigating to dashboard");
-            navigate('/dashboard', { replace: true });
+            // Short delay to ensure state is updated before navigation
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 100);
+            
+            // Extra fallback navigation for edge cases
+            setTimeout(() => {
+              const currentPath = window.location.pathname;
+              if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+                console.log("Still on auth page after SIGNED_IN event, forcing navigation");
+                navigate('/dashboard', { replace: true });
+              }
+            }, 1000);
           }
         } else {
+          console.log("No user in session after auth state change");
           setUser(null);
           setIsAdmin(false);
           setIsLoading(false);
@@ -109,6 +145,7 @@ export const useAuthState = ({
 
     // Cleanup subscription on unmount
     return () => {
+      console.log("Cleaning up auth state subscription");
       subscription.unsubscribe();
     };
   }, [navigate, setIsAdmin, setIsLoading, setSession, setUser]);

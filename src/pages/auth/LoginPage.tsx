@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,7 +26,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const LoginPage = () => {
-  const { login, loginWithGoogle, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login, loginWithGoogle, isAuthenticated, isLoading: authLoading, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,11 +34,22 @@ const LoginPage = () => {
   const [processingOAuth, setProcessingOAuth] = useState(false);
   const [initialAuthCheck, setInitialAuthCheck] = useState(true);
   const [loginAttempts, setLoginAttempts] = useState(0);
+  const navigationAttempted = useRef(false);
+  const authCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const loginTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const from = location.state?.from?.pathname || "/dashboard";
 
+  const forceNavigateToDashboard = () => {
+    console.log("Forcing navigation to dashboard");
+    navigationAttempted.current = true;
+    navigate('/dashboard', { replace: true });
+  };
+
   useEffect(() => {
     return () => {
+      if (authCheckInterval.current) clearInterval(authCheckInterval.current);
+      if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
       setIsSubmitting(false);
     };
   }, []);
@@ -52,55 +63,106 @@ const LoginPage = () => {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && !processingOAuth && !isSubmitting) {
-      console.log("User authenticated, navigating to dashboard");
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isAuthenticated, processingOAuth, navigate, isSubmitting]);
-
-  useEffect(() => {
-    let loginTimeout: NodeJS.Timeout;
-
-    if (isSubmitting && !authLoading) {
-      console.log("Login attempt in progress, setting timeout");
-
-      loginTimeout = setTimeout(() => {
-        console.log("Login attempt timed out after 10s");
-        const checkSessionStatus = async () => {
-          try {
-            console.log("Checking session status after timeout");
-            const { data } = await supabase.auth.getSession();
-            if (data.session) {
-              console.log("Session exists despite timeout, navigating to dashboard");
-              toast({
-                title: "Login successful",
-                description: "You are now logged in.",
-              });
-              setIsSubmitting(false);
-              navigate('/dashboard', { replace: true });
-              return;
-            }
-
-            setIsSubmitting(false);
-            setAuthError("Login attempt timed out. Please try again.");
-            toast({
-              variant: "destructive",
-              title: "Login timeout",
-              description: "Your login request took too long. Please try again.",
-            });
-          } catch (error) {
-            console.error("Error checking session after timeout:", error);
-            setIsSubmitting(false);
-            setAuthError("Login attempt timed out. Please try again.");
+    if (!navigationAttempted.current && !processingOAuth) {
+      authCheckInterval.current = setInterval(async () => {
+        try {
+          console.log("Performing direct session check");
+          const { data } = await supabase.auth.getSession();
+          
+          if (data.session) {
+            console.log("Session found in direct check, navigating to dashboard");
+            clearInterval(authCheckInterval.current!);
+            forceNavigateToDashboard();
           }
-        };
-
-        checkSessionStatus();
-      }, 10000);
+        } catch (error) {
+          console.error("Error checking session:", error);
+        }
+      }, 1000);
     }
 
     return () => {
-      if (loginTimeout) clearTimeout(loginTimeout);
+      if (authCheckInterval.current) {
+        clearInterval(authCheckInterval.current);
+      }
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    if (isAuthenticated && !processingOAuth && !navigationAttempted.current) {
+      console.log("User authenticated, navigating to dashboard");
+      forceNavigateToDashboard();
+    }
+  }, [isAuthenticated, processingOAuth, navigate]);
+
+  useEffect(() => {
+    if (isSubmitting && !authLoading) {
+      console.log("Login attempt in progress, setting progressive timeouts");
+
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
+      }
+
+      loginTimeoutRef.current = setTimeout(async () => {
+        try {
+          console.log("First timeout check - 5s after login attempt");
+          const { data } = await supabase.auth.getSession();
+          
+          if (data.session) {
+            console.log("Session found in first timeout check, navigating");
+            toast({
+              title: "Login successful",
+              description: "You are now logged in.",
+            });
+            setIsSubmitting(false);
+            forceNavigateToDashboard();
+            return;
+          }
+          
+          loginTimeoutRef.current = setTimeout(async () => {
+            try {
+              console.log("Second timeout check - 10s after login attempt");
+              const { data } = await supabase.auth.getSession();
+              
+              if (data.session) {
+                console.log("Session found in second timeout check, navigating");
+                toast({
+                  title: "Login successful",
+                  description: "You are now logged in.",
+                });
+                setIsSubmitting(false);
+                forceNavigateToDashboard();
+                return;
+              }
+              
+              loginTimeoutRef.current = setTimeout(() => {
+                console.log("Final timeout - login attempt timed out after 15s");
+                setIsSubmitting(false);
+                setAuthError("Login attempt timed out. Please try again.");
+                
+                toast({
+                  variant: "destructive",
+                  title: "Login timeout",
+                  description: "Your login request took too long. Please try again.",
+                });
+              }, 5000);
+            } catch (error) {
+              console.error("Error in second timeout check:", error);
+              setIsSubmitting(false);
+              setAuthError("Login verification failed. Please try again.");
+            }
+          }, 5000);
+        } catch (error) {
+          console.error("Error in first timeout check:", error);
+          setIsSubmitting(false);
+          setAuthError("Login verification failed. Please try again.");
+        }
+      }, 5000);
+    }
+
+    return () => {
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
+      }
     };
   }, [isSubmitting, authLoading, navigate]);
 
@@ -174,6 +236,7 @@ const LoginPage = () => {
     setIsSubmitting(true);
     setAuthError(null);
     setLoginAttempts(prev => prev + 1);
+    navigationAttempted.current = false;
     
     try {
       console.log("Attempting login with email:", data.email);
@@ -182,6 +245,19 @@ const LoginPage = () => {
       if (result.error) {
         throw result.error;
       }
+      
+      setTimeout(async () => {
+        try {
+          console.log("Performing immediate session check after login");
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData.session) {
+            console.log("Session verified after login, forcing navigation");
+            forceNavigateToDashboard();
+          }
+        } catch (err) {
+          console.error("Error in post-login session check:", err);
+        }
+      }, 500);
       
       console.log("Login successful, waiting for redirect");
     } catch (error) {
@@ -224,12 +300,82 @@ const LoginPage = () => {
     }
   };
 
-  const showLoadingState = (authLoading && initialAuthCheck) || processingOAuth;
-
   const handleResetSubmission = () => {
     setIsSubmitting(false);
     setAuthError("Login attempt was reset. Please try again.");
+    if (loginTimeoutRef.current) {
+      clearTimeout(loginTimeoutRef.current);
+    }
   };
+
+  const handleForceLogin = async () => {
+    if (isSubmitting) return;
+    
+    try {
+      setIsSubmitting(true);
+      setAuthError(null);
+      
+      const { data } = await supabase.auth.refreshSession();
+      
+      if (data.session) {
+        console.log("Session refreshed successfully, forcing navigation");
+        toast({
+          title: "Session refreshed",
+          description: "You have been signed in successfully.",
+        });
+        setTimeout(() => {
+          forceNavigateToDashboard();
+        }, 500);
+        return;
+      }
+      
+      setIsSubmitting(false);
+      setAuthError("Unable to refresh session. Please try logging in again.");
+    } catch (error) {
+      console.error("Force login error:", error);
+      setIsSubmitting(false);
+      setAuthError("Force login failed. Please try logging in normally.");
+    }
+  };
+
+  const showLoadingState = (authLoading && initialAuthCheck) || processingOAuth;
+
+  if (isSubmitting && loginAttempts > 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md max-w-md w-full">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-meeting-primary" />
+          <h2 className="mt-4 text-xl font-semibold">
+            Signing you in...
+          </h2>
+          <p className="mt-2 text-gray-500">
+            We're processing your login request. This may take a few moments.
+          </p>
+          <div className="mt-6">
+            <Button 
+              variant="link" 
+              className="text-sm text-gray-500" 
+              onClick={handleResetSubmission}
+            >
+              Cancel and try again
+            </Button>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <p className="text-sm text-gray-500 mb-2">
+              Having trouble signing in?
+            </p>
+            <Button 
+              variant="outline" 
+              className="mt-2 w-full" 
+              onClick={handleForceLogin}
+            >
+              Force Session Refresh
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (showLoadingState) {
     return (
@@ -467,3 +613,4 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+

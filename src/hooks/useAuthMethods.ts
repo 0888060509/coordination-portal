@@ -24,9 +24,10 @@ export const useAuthMethods = (
     let loginError: AuthError | undefined;
     
     try {
-      console.log("Attempting login for email:", email);
+      console.log("Attempting direct login for email:", email);
       setIsLoading(true);
       
+      // Step 1: Sign in with password - core auth operation
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -46,26 +47,71 @@ export const useAuthMethods = (
         return { error };
       }
       
-      console.log("Login successful, session created:", data.session ? "Yes" : "No");
+      if (!data.session || !data.user) {
+        const errMsg = "Login succeeded but no session or user was returned";
+        console.error(errMsg);
+        
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description: "Authentication succeeded but session data is missing. Please try again.",
+        });
+        
+        setIsLoading(false);
+        return { error: { message: errMsg } as AuthError };
+      }
+      
+      console.log("Login successful, session created:", data.session.user.id);
+      
+      // Step 2: Set session state immediately
       setSession(data.session);
       
-      if (data.session?.user) {
-        const userData = await fetchProfile(data.session.user.id, data.session);
+      // Step 3: Fetch user profile data directly
+      let userData: User | null = null;
+      try {
+        userData = await fetchProfile(data.user.id, data.session);
+        
         if (userData) {
+          console.log("User profile fetched successfully");
+          // Set user data immediately
           setUser(userData);
           setIsAdmin(userData.role === 'admin');
           
+          // Immediate success message
           toast({
             title: "Login successful",
             description: "Welcome back to MeetingMaster!",
           });
-          
-          // Force navigation to dashboard right after setting user data
-          navigate('/dashboard', { replace: true });
+        } else {
+          console.error("Failed to fetch user profile after login");
+          toast({
+            variant: "destructive",
+            title: "Login incomplete",
+            description: "Your account was authenticated but we couldn't load your profile.",
+          });
         }
+      } catch (profileError) {
+        console.error("Error fetching user profile:", profileError);
       }
       
+      // Step 4: Force immediate navigation regardless of profile fetch result
+      console.log("Forcing immediate navigation to dashboard");
       setIsLoading(false);
+      
+      // Use timeout to ensure state updates are processed before navigation
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 100);
+      
+      // Step 5: Add extra fallback for navigation
+      setTimeout(() => {
+        const currentPath = window.location.pathname;
+        if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+          console.log("Still on login page after timeout, forcing navigation");
+          window.location.href = '/dashboard';
+        }
+      }, 2000);
+      
       return { data };
     } catch (error) {
       console.error("Unexpected login error:", error);
