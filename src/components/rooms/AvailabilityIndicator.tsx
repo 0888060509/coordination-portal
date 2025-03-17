@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { getRoomAvailability } from '@/services/roomService';
+import { AvailabilityCheckResult } from '@/types/room.service';
 
 interface AvailabilityIndicatorProps {
   roomId: string;
@@ -15,7 +17,10 @@ const AvailabilityIndicator: React.FC<AvailabilityIndicatorProps> = ({
   startDate,
   endDate,
 }) => {
-  const [availability, setAvailability] = useState<{ available: boolean; conflictingBookings?: any[] }>({ available: false });
+  const [availability, setAvailability] = useState<AvailabilityCheckResult>({ 
+    is_available: false,
+    conflicting_bookings: [] 
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -26,7 +31,7 @@ const AvailabilityIndicator: React.FC<AvailabilityIndicatorProps> = ({
         setAvailability(result);
       } catch (error) {
         console.error('Error checking room availability:', error);
-        setAvailability({ available: false });
+        setAvailability({ is_available: false, conflicting_bookings: [] });
       } finally {
         setIsLoading(false);
       }
@@ -39,7 +44,7 @@ const AvailabilityIndicator: React.FC<AvailabilityIndicatorProps> = ({
     return <Badge variant="secondary">Checking...</Badge>;
   }
 
-  if (availability.available) {
+  if (availability.is_available) {
     return (
       <Badge className="bg-green-500">
         <CheckCircle className="mr-2 h-4 w-4" />
@@ -47,11 +52,11 @@ const AvailabilityIndicator: React.FC<AvailabilityIndicatorProps> = ({
       </Badge>
     );
   } else {
-    const startTime = availability.conflictingBookings && availability.conflictingBookings.length > 0
-      ? format(new Date(availability.conflictingBookings[0].start_time), 'h:mm a')
+    const startTime = availability.conflicting_bookings && availability.conflicting_bookings.length > 0
+      ? format(new Date(availability.conflicting_bookings[0].start_time), 'h:mm a')
       : 'N/A';
-    const endTime = availability.conflictingBookings && availability.conflictingBookings.length > 0
-      ? format(new Date(availability.conflictingBookings[0].end_time), 'h:mm a')
+    const endTime = availability.conflicting_bookings && availability.conflicting_bookings.length > 0
+      ? format(new Date(availability.conflicting_bookings[0].end_time), 'h:mm a')
       : 'N/A';
 
     return (

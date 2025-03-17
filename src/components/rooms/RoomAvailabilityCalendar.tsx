@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +15,7 @@ import { getRoomAvailability } from '@/services/roomService';
 import { getRoomBookings } from '@/services/bookingService';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AvailabilityCheckResult } from '@/types/room.service';
 
 interface RoomAvailabilityCalendarProps {
   roomId: string;
@@ -89,14 +89,14 @@ const RoomAvailabilityCalendar = ({
 
   // Check if a time slot is available
   const isTimeSlotAvailable = (date: Date) => {
-    if (!availabilityData || !availabilityData.conflictingBookings) return true;
+    if (!availabilityData || !availabilityData.conflicting_bookings) return true;
     
     // Convert the date to a timestamp for comparison
     const slotStart = date.getTime();
     const slotEnd = addHours(date, 1).getTime();
     
     // Check if there are any overlapping bookings
-    return !availabilityData.conflictingBookings.some(booking => {
+    return !availabilityData.conflicting_bookings.some(booking => {
       const bookingStart = typeof booking.start_time === 'string' 
         ? parseISO(booking.start_time).getTime()
         : booking.start_time.getTime();
@@ -217,7 +217,6 @@ const RoomAvailabilityCalendar = ({
                   </div>
                 ) : (
                   <div className="grid grid-cols-7 text-center">
-                    {/* Week days header */}
                     {generateWeekDays().map((day, index) => (
                       <div key={index} className="p-2 font-medium border-b">
                         <div>{format(day, 'EEE')}</div>
@@ -225,9 +224,7 @@ const RoomAvailabilityCalendar = ({
                       </div>
                     ))}
                     
-                    {/* Week availability overview */}
                     {generateWeekDays().map((day, dayIndex) => {
-                      // Create Date objects for the time slots
                       const morningDate = new Date(day);
                       morningDate.setHours(9, 0, 0, 0);
                       

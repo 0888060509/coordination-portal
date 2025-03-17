@@ -1,8 +1,8 @@
-
 import { ApiService } from './apiService';
 import { supabase } from '../lib/supabase';
-import { Room, RoomWithAmenities, Amenity } from '../types/room';
+import { Room, Amenity } from '../types/room';
 import { RoomDetails, TimeSlot, RoomFilters, AvailabilityCheckResult } from '../types/room.service';
+import { ApiError } from '../utils/errors';
 
 export class RoomService extends ApiService {
   /**
@@ -183,23 +183,28 @@ export class RoomService extends ApiService {
     roomId: string,
     startDate: Date,
     endDate: Date
-  ): Promise<TimeSlot[]> {
+  ): Promise<AvailabilityCheckResult> {
     try {
-      // Use the find_available_time_slots function
-      const { data, error } = await supabase
-        .rpc('find_available_time_slots', {
-          room_id: roomId,
-          date_to_check: startDate.toISOString().split('T')[0], // Just the date part
-          business_start_hour: 8,
-          business_end_hour: 18,
-          slot_duration_minutes: 60
-        });
+      // Get bookings for this room in the specified date range
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select('id, title, start_time, end_time')
+        .eq('room_id', roomId)
+        .eq('status', 'confirmed')
+        .gte('start_time', startDate.toISOString())
+        .lte('end_time', endDate.toISOString());
       
       if (error) {
         this.handleError(error);
       }
       
-      return data || [];
+      // Determine if the room is available (no conflicting bookings)
+      const hasConflictingBookings = bookings && bookings.length > 0;
+      
+      return {
+        is_available: !hasConflictingBookings,
+        conflicting_bookings: bookings || []
+      };
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;
