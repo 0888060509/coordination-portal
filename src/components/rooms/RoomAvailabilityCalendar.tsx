@@ -80,7 +80,9 @@ const RoomAvailabilityCalendar = ({
   const generateTimeSlots = () => {
     const slots = [];
     for (let hour = BUSINESS_START_HOUR; hour <= BUSINESS_END_HOUR; hour++) {
-      slots.push(new Date(selectedDate).setHours(hour, 0, 0, 0));
+      const date = new Date(selectedDate);
+      date.setHours(hour, 0, 0, 0);
+      slots.push(date);
     }
     return slots;
   };
@@ -163,7 +165,7 @@ const RoomAvailabilityCalendar = ({
                   ) : (
                     <div className="space-y-2">
                       {generateTimeSlots().map((timeSlot, index) => {
-                        const isAvailable = isTimeSlotAvailable(new Date(timeSlot));
+                        const isAvailable = isTimeSlotAvailable(timeSlot);
                         return (
                           <div 
                             key={index}
@@ -179,7 +181,7 @@ const RoomAvailabilityCalendar = ({
                               isAvailable ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                             )} />
                             <span className="font-medium">
-                              {format(new Date(timeSlot), 'h:mm a')} - {format(addHours(new Date(timeSlot), 1), 'h:mm a')}
+                              {format(timeSlot, 'h:mm a')} - {format(addHours(timeSlot, 1), 'h:mm a')}
                             </span>
                             <span className={cn(
                               "ml-auto text-sm font-medium",
@@ -231,10 +233,20 @@ const RoomAvailabilityCalendar = ({
                     
                     {/* Week availability overview */}
                     {generateWeekDays().map((day, dayIndex) => {
+                      // Create Date objects for the time slots
+                      const morningDate = new Date(day);
+                      morningDate.setHours(9, 0, 0, 0);
+                      
+                      const afternoonDate = new Date(day);
+                      afternoonDate.setHours(13, 0, 0, 0);
+                      
+                      const eveningDate = new Date(day);
+                      eveningDate.setHours(17, 0, 0, 0);
+                      
                       const dayAvailability = {
-                        morning: isTimeSlotAvailable(new Date(day).setHours(9, 0, 0, 0)),
-                        afternoon: isTimeSlotAvailable(new Date(day).setHours(13, 0, 0, 0)),
-                        evening: isTimeSlotAvailable(new Date(day).setHours(17, 0, 0, 0))
+                        morning: isTimeSlotAvailable(morningDate),
+                        afternoon: isTimeSlotAvailable(afternoonDate),
+                        evening: isTimeSlotAvailable(eveningDate)
                       };
                       
                       return (

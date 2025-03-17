@@ -15,7 +15,7 @@ import roomService from '@/services/roomService';
 import RoomGallery from './RoomGallery';
 import RoomAmenities from './RoomAmenities';
 import RoomAvailabilityCalendar from './RoomAvailabilityCalendar';
-import { BookingModal } from '@/components/bookings/BookingModal';
+import BookingModal from '@/components/bookings/BookingModal';
 
 const RoomDetail = () => {
   const { id } = useParams<{ id: string }>();
