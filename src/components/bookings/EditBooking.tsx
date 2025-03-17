@@ -1,426 +1,404 @@
 
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { z } from "zod";
+import { useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
-import { 
-  AlertCircle,
-  Calendar,
-  Clock,
-  MapPin
-} from "lucide-react";
-
-import { bookingService } from "@/services/bookingService";
-import { BookingWithDetails, CreateBookingData } from "@/types/booking";
-import { parseTimeString } from "@/utils/formatUtils";
-import { useToast } from "@/hooks/use-toast";
+import { format, addHours, parse } from "date-fns";
+import { toast } from "sonner";
+import { Building, Users, Clock, Calendar, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-
-// Define the form schema
-const editBookingSchema = z.object({
-  title: z.string().min(3, { message: "Title must be at least 3 characters" }),
-  description: z.string().optional(),
-  date: z.date(),
-  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Invalid time format" }),
-  endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Invalid time format" }),
-  attendees: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string().email(),
-    isExternal: z.boolean().default(false)
-  })).optional(),
-  equipment: z.array(z.string()).optional(),
-  specialRequests: z.string().optional(),
-});
-
-type EditBookingFormValues = z.infer<typeof editBookingSchema>;
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { getBookingById, updateBooking } from "@/services/bookingService";
+import { getRoomById } from "@/services/roomService";
+import { BookingWithDetails } from "@/types/booking";
+import { Room } from "@/types/room";
+import { useAuth } from "@/context/AuthContext";
 
 const EditBooking: React.FC = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  
+  const { user } = useAuth();
   const [booking, setBooking] = useState<BookingWithDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [room, setRoom] = useState<Room | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [availabilityChecked, setAvailabilityChecked] = useState(false);
-  const [isAvailable, setIsAvailable] = useState(true);
-  
-  const form = useForm<EditBookingFormValues>({
-    resolver: zodResolver(editBookingSchema),
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [tab, setTab] = useState("details");
+
+  const { register, handleSubmit, formState: { errors }, setValue, reset } = useForm({
     defaultValues: {
       title: "",
       description: "",
-      date: new Date(),
-      startTime: "09:00",
-      endTime: "10:00",
       attendees: [],
-      equipment: [],
-      specialRequests: "",
-    },
+      equipment_needed: [],
+      special_requests: "",
+      meeting_type: "general",
+    }
   });
-  
-  // Fetch booking data
+
   useEffect(() => {
-    if (bookingId) {
-      const fetchBooking = async () => {
-        try {
-          setLoading(true);
-          const data = await bookingService.getBookingById(bookingId);
-          
-          if (!data) {
-            throw new Error("Booking not found");
-          }
-          
-          setBooking(data);
-          
-          // Set form default values
-          const startTime = new Date(data.start_time);
-          const endTime = new Date(data.end_time);
-          
-          form.reset({
-            title: data.title,
-            description: data.description || "",
-            date: startTime,
-            startTime: format(startTime, "HH:mm"),
-            endTime: format(endTime, "HH:mm"),
-            attendees: data.attendees || [],
-            equipment: data.equipment_needed || [],
-            specialRequests: data.special_requests || "",
-          });
-          
-          setLoading(false);
-        } catch (err: any) {
-          setError(err.message || "Failed to load booking");
-          setLoading(false);
+    const fetchBookingDetails = async () => {
+      if (!bookingId) return;
+      
+      try {
+        setIsLoading(true);
+        const fetchedBooking = await getBookingById(bookingId);
+        
+        if (!fetchedBooking) {
+          toast.error("Booking not found");
+          navigate("/bookings");
+          return;
         }
-      };
-      
-      fetchBooking();
-    }
-  }, [bookingId, form]);
-  
-  // Check availability when form fields change
-  const checkAvailability = async (formData: EditBookingFormValues) => {
-    if (!booking) return;
-    
-    try {
-      const startDateTime = parseTimeString(formData.startTime, formData.date);
-      const endDateTime = parseTimeString(formData.endTime, formData.date);
-      
-      // Check if the time has actually changed
-      const originalStart = new Date(booking.start_time).getTime();
-      const originalEnd = new Date(booking.end_time).getTime();
-      
-      if (startDateTime.getTime() === originalStart && endDateTime.getTime() === originalEnd) {
-        setIsAvailable(true);
-        setAvailabilityChecked(true);
-        return true;
+        
+        // Check if the current user is the booking owner
+        if (user && fetchedBooking.user_id !== user.id && !user.role === "admin") {
+          toast.error("You don't have permission to edit this booking");
+          navigate("/bookings");
+          return;
+        }
+        
+        setBooking(fetchedBooking);
+        
+        // Fetch room details
+        const fetchedRoom = await getRoomById(fetchedBooking.room_id);
+        setRoom(fetchedRoom);
+        
+        // Setup form values
+        reset({
+          title: fetchedBooking.title,
+          description: fetchedBooking.description || "",
+          attendees: fetchedBooking.attendees || [],
+          equipment_needed: fetchedBooking.equipment_needed || [],
+          special_requests: fetchedBooking.special_requests || "",
+          meeting_type: fetchedBooking.meeting_type || "general",
+        });
+        
+        // Setup date and time
+        const bookingDate = new Date(fetchedBooking.start_time);
+        setDate(bookingDate);
+        setStartTime(format(bookingDate, "HH:mm"));
+        setEndTime(format(new Date(fetchedBooking.end_time), "HH:mm"));
+        
+      } catch (error) {
+        console.error("Error fetching booking details:", error);
+        toast.error("Failed to load booking details");
+      } finally {
+        setIsLoading(false);
       }
-      
-      const available = await bookingService.isRoomAvailable(
-        booking.room_id,
-        startDateTime,
-        endDateTime,
-        booking.id // Exclude current booking
-      );
-      
-      setIsAvailable(available);
-      setAvailabilityChecked(true);
-      return available;
-    } catch (err) {
-      console.error("Error checking availability:", err);
-      setIsAvailable(false);
-      setAvailabilityChecked(true);
-      return false;
-    }
-  };
-  
-  // Handle form submission
-  const onSubmit = async (data: EditBookingFormValues) => {
-    if (!booking) return;
+    };
     
+    fetchBookingDetails();
+  }, [bookingId, navigate, user, reset]);
+
+  const onSubmit = async (data: any) => {
+    if (!booking || !date || !startTime || !endTime) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       
-      // Check availability first
-      const available = await checkAvailability(data);
+      // Prepare date objects
+      const startDateTime = parse(`${format(date, "yyyy-MM-dd")} ${startTime}`, "yyyy-MM-dd HH:mm", new Date());
+      const endDateTime = parse(`${format(date, "yyyy-MM-dd")} ${endTime}`, "yyyy-MM-dd HH:mm", new Date());
       
-      if (!available) {
-        toast({
-          variant: "destructive",
-          title: "Room not available",
-          description: "The room is not available during the selected time period.",
-        });
+      // Check if end time is after start time
+      if (endDateTime <= startDateTime) {
+        toast.error("End time must be after start time");
         setIsSubmitting(false);
         return;
       }
       
-      // Create start and end date objects
-      const startDateTime = parseTimeString(data.startTime, data.date);
-      const endDateTime = parseTimeString(data.endTime, data.date);
-      
-      // Prepare booking data
-      const bookingData: Partial<CreateBookingData> = {
-        title: data.title,
-        description: data.description,
+      const updateData = {
+        ...data,
         start_time: startDateTime,
         end_time: endDateTime,
-        attendees: data.attendees?.map(a => a.id),
-        equipment_needed: data.equipment,
-        special_requests: data.specialRequests
       };
+
+      const success = await updateBooking(booking.id, updateData);
       
-      // Update booking
-      await bookingService.updateBooking(booking.id, bookingData);
-      
-      toast({
-        title: "Booking updated",
-        description: "Your booking has been updated successfully.",
-      });
-      
-      // Redirect to bookings list
-      navigate("/bookings");
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Update failed",
-        description: error.message || "Failed to update booking",
-      });
+      if (success) {
+        toast.success("Booking updated successfully");
+        navigate("/bookings");
+      } else {
+        toast.error("Failed to update booking");
+      }
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      toast.error("An error occurred while updating the booking");
     } finally {
       setIsSubmitting(false);
     }
   };
-  
-  // If loading, show skeleton
-  if (loading) {
+
+  if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-[400px] w-full rounded-md" />
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
-  
-  // If error, show error message
-  if (error) {
+
+  if (!booking || !room) {
     return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Error</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center p-6">
+              <h3 className="text-lg font-medium">Booking not found</h3>
+              <p className="text-muted-foreground mt-2">
+                The booking you're looking for doesn't exist or you don't have permission to view it.
+              </p>
+              <Button onClick={() => navigate("/bookings")} className="mt-4">
+                Back to Bookings
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
-  
-  // If booking not found, show error
-  if (!booking) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Booking Not Found</AlertTitle>
-        <AlertDescription>The booking you're trying to edit doesn't exist.</AlertDescription>
-      </Alert>
-    );
-  }
-  
+
   return (
-    <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Edit Booking</h1>
-      
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Edit Booking</h1>
+          <p className="text-muted-foreground">
+            Update your booking details for {room.name}
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => navigate("/bookings")}>
+          Cancel
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Booking Details</CardTitle>
+          <CardTitle>Booking Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="bg-muted/40 p-4 rounded-md mb-6">
-            <div className="flex items-center mb-2">
-              <Building className="h-4 w-4 mr-2 text-muted-foreground" />
-              <p className="font-semibold">{booking.room.name}</p>
-            </div>
-            <div className="flex items-center mb-2">
-              <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-              <p className="text-sm">
-                {booking.room.location}
-                {booking.room.floor ? `, Floor ${booking.room.floor}` : ""}
-                {booking.room.room_number ? `, Room ${booking.room.room_number}` : ""}
-              </p>
-            </div>
-            <div className="flex items-center">
-              <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-              <p className="text-sm">Capacity: {booking.room.capacity} people</p>
-            </div>
-          </div>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Meeting Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter meeting title" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="details">Meeting Details</TabsTrigger>
+              <TabsTrigger value="time">Date & Time</TabsTrigger>
+              <TabsTrigger value="attendees">Attendees & Resources</TabsTrigger>
+            </TabsList>
+            
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <TabsContent value="details">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="title">Meeting Title</Label>
+                    <Input
+                      id="title"
+                      {...register("title", { required: "Title is required" })}
+                      placeholder="Enter meeting title"
+                      className="mt-1"
+                    />
+                    {errors.title && (
+                      <p className="text-sm text-destructive mt-1">{errors.title.message as string}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      {...register("description")}
+                      placeholder="Enter meeting description"
+                      rows={3}
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="meeting_type">Meeting Type</Label>
+                    <Select
+                      value={booking.meeting_type || "general"}
+                      onValueChange={(value) => setValue("meeting_type", value)}
+                    >
+                      <SelectTrigger id="meeting_type" className="mt-1">
+                        <SelectValue placeholder="Select meeting type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General Meeting</SelectItem>
+                        <SelectItem value="client">Client Meeting</SelectItem>
+                        <SelectItem value="team">Team Meeting</SelectItem>
+                        <SelectItem value="interview">Interview</SelectItem>
+                        <SelectItem value="training">Training</SelectItem>
+                        <SelectItem value="workshop">Workshop</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="special_requests">Special Requests</Label>
+                    <Textarea
+                      id="special_requests"
+                      {...register("special_requests")}
+                      placeholder="Any special requests or setup requirements"
+                      rows={2}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
               
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Enter meeting description"
-                        className="resize-none"
-                        {...field}
+              <TabsContent value="time">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-1">
+                      <Label>Date</Label>
+                      <div className="border rounded-md mt-1 p-0.5">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal mt-1"
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {date ? format(date, "PPP") : "Select a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <CalendarComponent
+                              mode="single"
+                              selected={date}
+                              onSelect={setDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="start_time">Start Time</Label>
+                      <Input
+                        id="start_time"
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="mt-1"
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <Separator />
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <FormField
-                  control={form.control}
-                  name="date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date</FormLabel>
-                      <FormControl>
-                        <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <p>{format(field.value, "MMMM d, yyyy")}</p>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="startTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Time</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="time"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setAvailabilityChecked(false);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="endTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Time</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="time"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setAvailabilityChecked(false);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              {availabilityChecked && !isAvailable && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Room Not Available</AlertTitle>
-                  <AlertDescription>
-                    The room is not available during the selected time period.
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              <Separator />
-              
-              <FormField
-                control={form.control}
-                name="specialRequests"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Special Requests</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Any special requirements for this booking?"
-                        className="resize-none"
-                        {...field}
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="end_time">End Time</Label>
+                      <Input
+                        id="end_time"
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="mt-1"
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-md bg-muted p-4 mt-4">
+                    <div className="flex items-start">
+                      <Info className="h-5 w-5 mr-2 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <h4 className="font-medium">Room Availability</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          When you change the time, we'll automatically check if the room is still available.
+                          If there's a conflict with another booking, you'll be notified before saving.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
               
-              <div className="flex justify-end gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+              <TabsContent value="attendees">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="attendees">Attendees (email addresses)</Label>
+                    <Textarea
+                      id="attendees"
+                      {...register("attendees")}
+                      placeholder="Enter email addresses, separated by commas"
+                      rows={3}
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Enter email addresses separated by commas. Attendees will receive updated booking notifications.
+                    </p>
+                  </div>
+                  
+                  <Separator className="my-4" />
+                  
+                  <div>
+                    <Label htmlFor="equipment_needed">Equipment Needed</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="projector"
+                          value="projector"
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <Label htmlFor="projector" className="font-normal">Projector</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="videoconference"
+                          value="videoconference"
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <Label htmlFor="videoconference" className="font-normal">Video Conference System</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="whiteboard"
+                          value="whiteboard"
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <Label htmlFor="whiteboard" className="font-normal">Whiteboard</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="catering"
+                          value="catering"
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <Label htmlFor="catering" className="font-normal">Catering Service</Label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => navigate("/bookings")}
+                  disabled={isSubmitting}
                 >
                   Cancel
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={async () => {
-                    const formData = form.getValues();
-                    await checkAvailability(formData);
-                  }}
-                >
-                  Check Availability
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? "Updating..." : "Update Booking"}
                 </Button>
               </div>
             </form>
-          </Form>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

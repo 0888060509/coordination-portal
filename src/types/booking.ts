@@ -20,6 +20,11 @@ export interface UserProfile {
 export interface BookingWithDetails extends Omit<Booking, 'rooms' | 'profiles'> {
   room: Room;
   user: UserProfile;
+  attendees?: string[];
+  equipment_needed?: string[];
+  special_requests?: string;
+  meeting_type?: string;
+  recurring_pattern_id?: string;
 }
 
 export interface CreateBookingData {
