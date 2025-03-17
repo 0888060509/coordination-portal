@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -39,8 +40,8 @@ import {
   Clock,
   MapPin,
 } from 'lucide-react';
-import roomService, { RoomFilterOptions } from '@/services/roomService';
-import { RoomWithAmenities, Amenity } from '@/types/room';
+import roomService from '@/services/roomService';
+import { RoomWithAmenities, Amenity, RoomFilterOptions } from '@/types/index';
 
 import {
   Popover,

@@ -7,7 +7,6 @@ export type Amenity = Database['public']['Tables']['amenities']['Row'];
 export type RoomAmenity = Database['public']['Tables']['room_amenities']['Row'];
 export type Booking = Database['public']['Tables']['bookings']['Row'];
 export type RecurringPattern = Database['public']['Tables']['recurring_patterns']['Row'];
-export type Notification = Database['public']['Tables']['notifications']['Row'];
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 
 // Room status enum
@@ -25,6 +24,7 @@ export type FrequencyType = 'daily' | 'weekly' | 'monthly';
 // Extended types for UI components
 export interface RoomWithAmenities extends Room {
   amenities: Amenity[];
+  status: RoomStatus; // Add status field explicitly
 }
 
 export interface BookingWithDetails extends Omit<Booking, 'room' | 'user'> {
