@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import { useUIContext } from '@/context/UIContext';
 import Header from './Header';
@@ -9,6 +9,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 
 const AppLayout = () => {
   const { state: uiState } = useUIContext();
+  const navigate = useNavigate();
   
   return (
     <div className="flex h-screen overflow-hidden">

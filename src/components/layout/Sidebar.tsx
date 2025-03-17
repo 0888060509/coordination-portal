@@ -1,97 +1,115 @@
 
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { cn } from "@/lib/utils";
-import { Home, Calendar, Search, List, Settings, HelpCircle, Bell } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { NavLink, useNavigate } from 'react-router-dom';
+import { 
+  LayoutDashboard, Calendar, Users, Settings,
+  LogOut, HelpCircle, Bell, BookOpen
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 import { useUIContext } from '@/context/UIContext';
-import { useNotificationContext } from '@/context/NotificationContext';
+import NavItem from './NavItem';
+import { Button } from '@/components/ui/button';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 const Sidebar = () => {
+  const { isAdmin, logout } = useAuth();
   const { state: uiState } = useUIContext();
-  const { state: notificationState } = useNotificationContext();
-  const location = useLocation();
+  const navigate = useNavigate();
   
-  const navItems = [
-    { name: 'Dashboard', icon: Home, path: '/dashboard' },
-    { name: 'Find Rooms', icon: Search, path: '/rooms' },
-    { name: 'My Bookings', icon: Calendar, path: '/bookings' },
-    { 
-      name: 'Notifications', 
-      icon: Bell, 
-      path: '/notifications',
-      badge: notificationState.unreadCount > 0 ? notificationState.unreadCount : undefined
-    },
-    { name: 'Settings', icon: Settings, path: '/settings' },
-    { name: 'Help', icon: HelpCircle, path: '/help' },
-  ];
-  
-  const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
-  
+
   return (
-    <aside
-      className={cn(
-        "fixed left-0 h-screen bg-sidebar-background border-r border-sidebar-border transition-all duration-200 z-20 overflow-x-hidden overflow-y-auto",
-        uiState.sidebarOpen ? "w-60" : "w-[70px]"
-      )}
-    >
-      <div className="flex flex-col h-full py-4">
-        <div className="px-4 mb-8">
-          <h1 className={cn(
-            "font-bold truncate transition-all",
-            uiState.sidebarOpen ? "text-xl text-left" : "text-sm text-center"
-          )}>
-            {uiState.sidebarOpen ? 'Room Booking' : 'RB'}
-          </h1>
-        </div>
-        
-        <div className="flex-1 space-y-1">
-          {navItems.map((item) => (
-            <div
-              key={item.name}
-              className="relative mx-2"
-              title={uiState.sidebarOpen ? undefined : item.name}
+    <SidebarProvider>
+      <aside 
+        className={cn(
+          "fixed left-0 top-0 z-20 h-screen bg-background border-r transition-all duration-200",
+          uiState.sidebarOpen ? "w-60" : "w-[70px]"
+        )}
+      >
+        <div className="flex flex-col h-full">
+          <div className="flex items-center h-16 px-4 border-b">
+            <NavLink 
+              to="/dashboard" 
+              className="flex items-center gap-2 font-bold text-xl"
             >
-              <NavLink
-                to={item.path}
-                className={({ isActive }) => cn(
-                  "flex items-center px-4 py-3 rounded-md transition-colors",
-                  isActive 
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                    : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
-                )}
-              >
-                <item.icon className="h-5 w-5 shrink-0" />
-                {uiState.sidebarOpen && (
-                  <span className="ml-4 truncate">{item.name}</span>
-                )}
-                {item.badge && (
-                  <Badge 
-                    variant="destructive"
-                    className={cn(
-                      "absolute rounded-full",
-                      uiState.sidebarOpen 
-                        ? "right-4 top-3" 
-                        : "right-1/2 top-1 translate-x-1/2"
-                    )}
-                  >
-                    {item.badge}
-                  </Badge>
-                )}
-              </NavLink>
-            </div>
-          ))}
-        </div>
-        
-        <div className="mt-4 border-t border-sidebar-border pt-4 px-4">
-          <div className="text-xs text-center text-muted-foreground">
-            {uiState.sidebarOpen ? 'Room Booking System v1.0' : 'v1.0'}
+              <Calendar className="h-6 w-6" />
+              {uiState.sidebarOpen && <span>MeetingMaster</span>}
+            </NavLink>
+          </div>
+
+          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+            <NavItem 
+              to="/dashboard" 
+              icon={<LayoutDashboard />} 
+              label="Dashboard" 
+              expanded={uiState.sidebarOpen}
+            />
+            
+            <NavItem 
+              to="/rooms" 
+              icon={<BookOpen />} 
+              label="Rooms" 
+              expanded={uiState.sidebarOpen}
+            />
+            
+            <NavItem 
+              to="/bookings" 
+              icon={<Calendar />} 
+              label="Bookings" 
+              expanded={uiState.sidebarOpen}
+            />
+            
+            <NavItem 
+              to="/notifications" 
+              icon={<Bell />} 
+              label="Notifications" 
+              expanded={uiState.sidebarOpen}
+            />
+            
+            {isAdmin && (
+              <NavItem 
+                to="/admin" 
+                icon={<Users />} 
+                label="Admin" 
+                expanded={uiState.sidebarOpen}
+              />
+            )}
+            
+            <NavItem 
+              to="/help" 
+              icon={<HelpCircle />} 
+              label="Help" 
+              expanded={uiState.sidebarOpen}
+            />
+            
+            <NavItem 
+              to="/settings" 
+              icon={<Settings />} 
+              label="Settings" 
+              expanded={uiState.sidebarOpen}
+            />
+          </nav>
+
+          <div className="p-4 border-t">
+            <Button 
+              variant="ghost" 
+              className={cn(
+                "w-full justify-start",
+                !uiState.sidebarOpen && "justify-center p-2"
+              )}
+              onClick={handleLogout}
+            >
+              <LogOut className={cn("h-5 w-5", uiState.sidebarOpen && "mr-2")} />
+              {uiState.sidebarOpen && <span>Logout</span>}
+            </Button>
           </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </SidebarProvider>
   );
 };
 

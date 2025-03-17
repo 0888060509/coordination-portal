@@ -18,3 +18,14 @@ The issue was caused by a mismatch between the function names exported in `navig
 - Simplified page components to focus on content rather than layout
 
 The issue was caused by multiple sidebar implementations being rendered simultaneously. BookingsPage and potentially other pages were rendering their own sidebars while the AppLayout was also rendering a sidebar. The fix centralizes sidebar management to ensure only one sidebar is rendered at a time.
+
+## 2025-03-17: Fixed Navigation Issues
+
+- Updated App.tsx to use the proper page components for different routes
+- Ensured all route paths correctly map to their respective page components
+- Fixed Sidebar component to use correct NavLink components for navigation
+- Updated Header component to use Link components for navigation
+- Added proper imports for all page components in App.tsx
+
+The navigation issue was caused by incorrect route definitions and page component mappings. Some routes were pointing to placeholder components, causing navigation failures. The fix ensures that all routes correctly map to their respective page components.
+
