@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -120,7 +119,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
   
   const totalSteps = 4;
   
-  // Check recurring availability whenever relevant options change
   useEffect(() => {
     const checkAvailability = async () => {
       if (!isRecurring || !recurringOptions) return;
@@ -131,7 +129,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
         const startDateTime = parseTimeString(startTimeValue, dateValue);
         const endDateTime = parseTimeString(endTimeValue, dateValue);
         
-        // Prepare the pattern data
         const patternData = {
           frequency: recurringOptions.frequency,
           interval: recurringOptions.interval,
@@ -140,7 +137,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
           maxOccurrences: recurringOptions.endType === "occurrences" ? recurringOptions.maxOccurrences : undefined
         };
         
-        // Check availability
         const availability = await checkRecurringAvailability(
           room.id,
           startDateTime,
@@ -148,7 +144,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
           patternData
         );
         
-        // Map to RecurringInstance format
         const instances: RecurringInstance[] = availability.map(item => ({
           date: item.date,
           available: item.available,
@@ -186,13 +181,11 @@ const BookingForm: React.FC<BookingFormProps> = ({
     room.id
   ]);
   
-  // Handle recurring options change
   const handleRecurringOptionsChange = (options: RecurringOptions) => {
     form.setValue("isRecurring", options.isRecurring);
     form.setValue("recurringOptions", options);
   };
   
-  // Handle exclude/include instance
   const handleExcludeInstance = (date: Date) => {
     setExcludedDates(prev => [...prev, date]);
     setRecurringInstances(prev => 
@@ -215,7 +208,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
     );
   };
   
-  // Generate recurrence description
   const getRecurrenceDescription = (): string => {
     if (!isRecurring || !recurringOptions) return '';
     
@@ -295,7 +287,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
       let bookingId: string;
       
       if (data.isRecurring && data.recurringOptions) {
-        // Create a recurring booking
         const recurringPattern = {
           frequency: data.recurringOptions.frequency,
           interval: data.recurringOptions.interval,
@@ -311,18 +302,16 @@ const BookingForm: React.FC<BookingFormProps> = ({
           throw new Error("Failed to create any bookings due to conflicts");
         }
         
-        // Use the first booking as the reference
         bookingId = result.bookingIds[0];
         
         if (result.conflicts.length > 0) {
           toast({
             title: "Some recurring bookings could not be created",
             description: `${result.conflicts.length} instance(s) had conflicts and were not booked`,
-            variant: "warning",
+            variant: "destructive",
           });
         }
       } else {
-        // Create a single booking
         bookingId = await createBooking(bookingData);
       }
       

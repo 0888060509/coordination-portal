@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Booking, BookingWithDetails, CreateBookingData, RecurringPattern } from '@/types/booking';
-import { Room } from '@/types/room';
 
 // Get a booking by ID with related details
 export const getBooking = async (bookingId: string): Promise<BookingWithDetails | null> => {
@@ -438,6 +437,8 @@ export const updateBooking = async (
         end_time: formattedData.end_time,
         recurring_pattern_id: formattedData.recurring_pattern_id,
         status: formattedData.status,
+        meeting_type: formattedData.meeting_type,
+        special_requests: formattedData.special_requests
       })
       .eq('id', bookingId);
 
@@ -565,16 +566,23 @@ export const updateRecurringBooking = async (
 
     // Then update all the bookings in the series
     if (bookingData) {
+      const updateData: any = {
+        title: bookingData.title,
+        description: bookingData.description
+      };
+      
+      // Only add these properties if they exist in the bookingData
+      if ('meeting_type' in bookingData) {
+        updateData.meeting_type = bookingData.meeting_type;
+      }
+      
+      if ('special_requests' in bookingData) {
+        updateData.special_requests = bookingData.special_requests;
+      }
+      
       const { error } = await supabase
         .from('bookings')
-        .update({
-          title: bookingData.title,
-          description: bookingData.description,
-          // Don't update start_time and end_time as they need to be calculated based on the pattern
-          // Don't update room_id as it would require rechecking availability
-          meeting_type: bookingData.meeting_type,
-          special_requests: bookingData.special_requests
-        })
+        .update(updateData)
         .eq('recurring_pattern_id', patternId)
         .eq('status', 'confirmed');
 

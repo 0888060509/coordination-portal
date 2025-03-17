@@ -42,3 +42,10 @@
 - Added getRecurringBookingInstances, cancelRecurringBooking, and updateRecurringBooking functions
 - Enhanced CancelBookingModal to support canceling single instances or entire series
 - Added recurrence pattern description generator and instance exclusion functionality
+
+## June 17, 2024
+- Fixed TypeScript errors in booking-related components
+- Updated the Booking type to include missing properties: meeting_type, special_requests
+- Fixed toast variant in BookingForm from "warning" to "destructive"
+- Updated bookingService to properly handle optional properties in updateRecurringBooking function
+- Enhanced type safety in the booking service operations
