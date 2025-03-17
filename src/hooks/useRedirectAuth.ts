@@ -1,9 +1,9 @@
 
 import { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { forceToDashboard, forceToLogin } from '@/services/navigationService';
+import { forceToDashboard, forceToLogin, navigateTo } from '@/services/navigationService';
 
 /**
  * A simplified hook that handles authentication redirects
@@ -11,17 +11,24 @@ import { forceToDashboard, forceToLogin } from '@/services/navigationService';
  */
 export function useRedirectAuth() {
   const location = useLocation();
+  const navigate = useNavigate();
   const checkInterval = useRef<NodeJS.Timeout | null>(null);
   const navigationTimeout = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  
+  // Set up isMounted ref for cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   
   // Set up authentication check
   useEffect(() => {
-    // Flag to track component mounted state
-    let isMounted = true;
-    
     // Check for active session directly
     const checkSession = async () => {
-      if (!isMounted) return;
+      if (!isMountedRef.current) return;
       
       try {
         const { data } = await supabase.auth.getSession();
@@ -33,13 +40,15 @@ export function useRedirectAuth() {
             // Store success in localStorage for other components
             localStorage.setItem('auth_success', 'true');
             localStorage.setItem('auth_timestamp', Date.now().toString());
-            forceToDashboard('useRedirectAuth-session');
+            navigate('/dashboard', { replace: true });
           }
         } else {
           const currentPath = window.location.pathname;
-          if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/') {
+          if (currentPath !== '/login' && currentPath !== '/register' && 
+              currentPath !== '/' && !currentPath.includes('/reset-password') && 
+              !currentPath.includes('/forgot-password')) {
             console.log("🔐 No active session in useRedirectAuth");
-            forceToLogin('useRedirectAuth-no-session');
+            navigate('/login', { replace: true });
           }
         }
       } catch (error) {
@@ -56,7 +65,7 @@ export function useRedirectAuth() {
         if (location.pathname !== '/dashboard') {
           checkSession();
         }
-      }, 2000); // Less frequent checks to avoid overwhelming the system
+      }, 5000); // Less frequent checks to avoid overwhelming the system
     }
     
     // Set a hard timeout to stop checking after reasonable time
@@ -69,7 +78,7 @@ export function useRedirectAuth() {
     
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isMounted) return;
+      if (!isMountedRef.current) return;
       
       console.log("🔐 Auth state changed:", event, session ? "Session exists" : "No session");
       
@@ -79,7 +88,7 @@ export function useRedirectAuth() {
         
         const currentPath = window.location.pathname;
         if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
-          forceToDashboard('useRedirectAuth-SIGNED_IN');
+          navigate('/dashboard', { replace: true });
         }
         
         toast({
@@ -97,13 +106,13 @@ export function useRedirectAuth() {
           description: "You have been logged out successfully",
         });
         
-        forceToLogin('useRedirectAuth-SIGNED_OUT');
+        navigate('/login', { replace: true });
       }
     });
     
     // Cleanup
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
       
       if (checkInterval.current) {
         clearInterval(checkInterval.current);
@@ -115,10 +124,17 @@ export function useRedirectAuth() {
       
       subscription.unsubscribe();
     };
-  }, [location.pathname]);
+  }, [location.pathname, navigate]);
   
   return {
-    forceToDashboard: () => forceToDashboard('useRedirectAuth-explicit'),
-    forceToLogin: () => forceToLogin('useRedirectAuth-explicit')
+    forceToDashboard: () => {
+      navigate('/dashboard', { replace: true });
+    },
+    forceToLogin: () => {
+      navigate('/login', { replace: true });
+    },
+    navigateTo: (path: string) => {
+      navigate(path, { replace: false });
+    }
   };
 }

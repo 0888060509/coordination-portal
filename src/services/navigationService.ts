@@ -45,8 +45,15 @@ export const forceToDashboard = (source: string = 'unknown') => {
   localStorage.setItem('auth_success', 'true');
   localStorage.setItem('auth_timestamp', currentTime.toString());
   
-  // Use direct window.location.href for guaranteed navigation
-  window.location.href = '/dashboard';
+  // Use React Router history instead of direct window.location for better SPA behavior
+  try {
+    window.history.pushState({}, "", '/dashboard');
+    // Dispatch a popstate event to ensure React Router updates
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  } catch (e) {
+    // Fallback to direct location change if the approach above doesn't work
+    window.location.href = '/dashboard';
+  }
   
   // Reset flag after a delay
   setTimeout(() => {
@@ -92,8 +99,15 @@ export const forceToLogin = (source: string = 'unknown') => {
   localStorage.removeItem('auth_success');
   localStorage.removeItem('auth_timestamp');
   
-  // Use direct window.location.href for guaranteed navigation
-  window.location.href = '/login';
+  // Use React Router history instead of direct window.location for better SPA behavior
+  try {
+    window.history.pushState({}, "", '/login');
+    // Dispatch a popstate event to ensure React Router updates
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  } catch (e) {
+    // Fallback to direct location change if the approach above doesn't work
+    window.location.href = '/login';
+  }
   
   // Reset flag after a delay
   setTimeout(() => {
@@ -138,4 +152,54 @@ export const checkAuthRedirect = async () => {
   }
   
   return false;
+};
+
+/**
+ * Navigate to a specific route within the application
+ * This uses React Router's history API for SPA navigation
+ */
+export const navigateTo = (route: string, source: string = 'unknown') => {
+  const currentTime = Date.now();
+  const currentPath = window.location.pathname;
+  
+  // Only navigate if we're not already on the route and not in cooldown period
+  if (currentPath === route) {
+    console.log(`🚀 NAVIGATION: Already on ${route} (requested by ${source})`);
+    return false;
+  }
+  
+  // Prevent multiple navigations in rapid succession
+  if (redirectionInProgress) {
+    console.log(`🚀 NAVIGATION: Navigation already in progress (requested by ${source})`);
+    return false;
+  }
+  
+  // Check for cooldown
+  if (currentTime - lastRedirectTime < redirectionCooldown) {
+    console.log(`🚀 NAVIGATION: In cooldown period (requested by ${source})`);
+    return false;
+  }
+  
+  // Set navigation flags
+  redirectionInProgress = true;
+  lastRedirectTime = currentTime;
+  
+  console.log(`🚀 NAVIGATION: Navigating to ${route} (requested by ${source})`);
+  
+  // Use React Router history API for SPA navigation
+  try {
+    window.history.pushState({}, "", route);
+    // Dispatch a popstate event to ensure React Router updates
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  } catch (e) {
+    // Fallback to direct location change if the approach above doesn't work
+    window.location.href = route;
+  }
+  
+  // Reset flag after a delay
+  setTimeout(() => {
+    redirectionInProgress = false;
+  }, redirectionCooldown);
+  
+  return true;
 };

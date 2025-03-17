@@ -33,7 +33,11 @@ const DashboardLayout = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate("/login");
+  };
+
+  const handleNavigation = (path: string) => {
+    setSidebarOpen(false);
+    navigate(path);
   };
 
   const navItems = [
@@ -139,10 +143,7 @@ const DashboardLayout = () => {
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  onClick={() => {
-                    setSidebarOpen(false);
-                    navigate("/profile");
-                  }}
+                  onClick={() => handleNavigation("/profile")}
                 >
                   <User className="mr-2 h-4 w-4" />
                   Profile

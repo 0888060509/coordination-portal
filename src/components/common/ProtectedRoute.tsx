@@ -26,15 +26,32 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const hasNavigatedRef = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track if the component is mounted
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const hasAuthHash = location.hash && location.hash.includes('access_token');
 
   // Force render content after a reasonable timeout to prevent infinite loading
   useEffect(() => {
     // If we're still loading after 5 seconds, force render content
     loadingTimeoutRef.current = setTimeout(() => {
-      if (isLoading) {
+      if (isMountedRef.current && isLoading) {
         console.log("ProtectedRoute: Force rendering content after timeout");
         setForceRenderContent(true);
+        
+        // After additional time, check if we need to navigate to login
+        setTimeout(() => {
+          if (isMountedRef.current && !isAuthenticated && authInitialized) {
+            navigate("/login", { replace: true });
+          }
+        }, 2000);
       }
     }, 5000);
     
@@ -43,8 +60,9 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
         clearTimeout(loadingTimeoutRef.current);
       }
     };
-  }, [isLoading]);
+  }, [isLoading, isAuthenticated, authInitialized, navigate]);
 
+  // Check for auth success in localStorage
   useEffect(() => {
     const authSuccess = localStorage.getItem('auth_success');
     const authTimestamp = localStorage.getItem('auth_timestamp');
@@ -56,86 +74,19 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
       
       if (now - timestamp < fiveMinutesMs) {
         console.log("Found recent auth success in localStorage");
-        if (window.location.pathname !== '/dashboard') {
-          console.log("Redirecting to dashboard based on localStorage");
-          navigate('/dashboard', { replace: true });
-        }
       }
     }
   }, [navigate]);
   
+  // Process auth hash if present
   useEffect(() => {
-    let isMounted = true;
-    
-    if (isAuthenticated && !user && !isLoading && !verifyingSession) {
-      const checkSession = async () => {
-        if (!isMounted) return;
-        
-        setVerifyingSession(true);
-        try {
-          console.log("Verifying session validity");
-          const isValid = await verifySession();
-          
-          if (!isMounted) return;
-          
-          if (!isValid) {
-            console.log("Session invalid, redirecting to login");
-            localStorage.removeItem('auth_success');
-            localStorage.removeItem('auth_timestamp');
-            
-            toast({
-              variant: "destructive",
-              title: "Session expired",
-              description: "Your session has expired. Please sign in again.",
-            });
-            
-            if (!hasNavigatedRef.current) {
-              hasNavigatedRef.current = true;
-              navigate("/login", { replace: true });
-            }
-          } else {
-            console.log("Session verified successfully");
-            
-            if ((location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/') && !hasNavigatedRef.current) {
-              console.log("Valid session but on auth page, redirecting to dashboard");
-              hasNavigatedRef.current = true;
-              navigate('/dashboard', { replace: true });
-            }
-          }
-        } catch (error) {
-          console.error("Error verifying session:", error);
-          
-          if (!isMounted) return;
-          
-          if (!hasNavigatedRef.current) {
-            hasNavigatedRef.current = true;
-            navigate("/login", { replace: true });
-          }
-        } finally {
-          if (isMounted) {
-            setVerifyingSession(false);
-          }
-        }
-      };
+    if (hasAuthHash && !isAuthenticated && !processingAuth && processingAttempts < 3 && !hasTriedProcessing && !authProcessComplete) {
+      if (!isMountedRef.current) return;
       
-      checkSession();
-    }
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated, user, isLoading, navigate, verifyingSession, location.pathname]);
-
-  useEffect(() => {
-    let isMounted = true;
-    
-    const handleAuthHash = async () => {
-      if (hasAuthHash && !isAuthenticated && !processingAuth && processingAttempts < 3 && !hasTriedProcessing && !authProcessComplete) {
-        if (!isMounted) return;
-        
-        setProcessingAuth(true);
-        setHasTriedProcessing(true);
-        
+      setProcessingAuth(true);
+      setHasTriedProcessing(true);
+      
+      const processHash = async () => {
         try {
           console.log("ProtectedRoute: Processing auth hash manually, attempt:", processingAttempts + 1);
           
@@ -145,7 +96,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           
           const session = await processAuthHash();
           
-          if (!isMounted) return;
+          if (!isMountedRef.current) return;
           
           if (!session) {
             console.error("Failed to process auth hash");
@@ -162,21 +113,9 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             
             localStorage.setItem('auth_success', 'true');
             localStorage.setItem('auth_timestamp', Date.now().toString());
-            
-            if (!hasNavigatedRef.current) {
-              hasNavigatedRef.current = true;
-              navigate('/dashboard', { replace: true });
-              
-              setTimeout(() => {
-                if (window.location.pathname.includes('login')) {
-                  console.log("Still on login page after hash processing, forcing direct navigation");
-                  window.location.href = '/dashboard';
-                }
-              }, 500);
-            }
           }
         } catch (error) {
-          if (!isMounted) return;
+          if (!isMountedRef.current) return;
           
           console.error("Error processing auth hash:", error);
           setProcessingAttempts(prev => prev + 1);
@@ -187,48 +126,32 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
             description: "Failed to complete authentication. Please try again.",
           });
         } finally {
-          if (isMounted) {
+          if (isMountedRef.current) {
             setProcessingAuth(false);
           }
         }
-      }
-    };
+      };
 
-    handleAuthHash();
+      processHash();
+    }
+  }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts, hasTriedProcessing, authProcessComplete]);
+
+  // Show authentication timeout after 10 seconds of loading
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    
+    if (isLoading || processingAuth) {
+      timer = setTimeout(() => {
+        if (isMountedRef.current) {
+          setAuthTimeout(true);
+        }
+      }, 10000);
+    }
     
     return () => {
-      isMounted = false;
+      if (timer) clearTimeout(timer);
     };
-  }, [hasAuthHash, isAuthenticated, processingAuth, processingAttempts, navigate, hasTriedProcessing, authProcessComplete]);
-
-  useEffect(() => {
-    if (isAuthenticated && !processingAuth && !isLoading && !hasNavigatedRef.current) {
-      const currentPath = window.location.pathname;
-      if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
-        console.log("Authenticated user on auth page, redirecting to dashboard");
-        hasNavigatedRef.current = true;
-        navigate('/dashboard', { replace: true });
-        
-        setTimeout(() => {
-          if (window.location.pathname !== '/dashboard') {
-            window.location.href = '/dashboard';
-          }
-        }, 500);
-      }
-    }
-  }, [isAuthenticated, processingAuth, isLoading, navigate, hasNavigatedRef]);
-
-  // If we're on the dashboard route and stuck loading, force render content
-  useEffect(() => {
-    if (location.pathname === '/dashboard' && isLoading && !forceRenderContent) {
-      const timer = setTimeout(() => {
-        console.log("We're on dashboard but still loading, forcing content render");
-        setForceRenderContent(true);
-      }, 3000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [location.pathname, isLoading, forceRenderContent]);
+  }, [isLoading, processingAuth]);
 
   const retryAuth = async () => {
     if (hasAuthHash) {
@@ -259,10 +182,8 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
-            refresh_token: refreshToken || null,
-            ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } as any : {}),
-            ...(expiresAt ? { expires_at: expiresAt } as any : {}),
-            token_type: params.get('token_type') || 'bearer'
+            refresh_token: refreshToken || "",
+            ...(expiresIn ? { expires_in: parseInt(expiresIn, 10) } : {}),
           });
           
           if (error || !data.session) {
@@ -310,7 +231,9 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
           description: "Failed to complete authentication. Please try again.",
         });
       } finally {
-        setProcessingAuth(false);
+        if (isMountedRef.current) {
+          setProcessingAuth(false);
+        }
       }
     }
   };
@@ -328,13 +251,8 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     navigate('/login', { replace: true });
   };
 
-  // Show the children if we're on the dashboard and authenticated, even if still technically loading
-  if (location.pathname === '/dashboard' && (isAuthenticated || forceRenderContent)) {
-    return <>{children}</>;
-  }
-
-  // Don't get stuck in loading state - if authenticated and auth is initialized, show the content
-  if (isAuthenticated && authInitialized) {
+  // Show the children if we're authenticated, even if still technically loading
+  if (isAuthenticated || forceRenderContent) {
     return <>{children}</>;
   }
 
