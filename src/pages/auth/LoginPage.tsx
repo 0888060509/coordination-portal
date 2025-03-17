@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,6 +18,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { processAuthHash, supabase } from "@/integrations/supabase/client";
 import { useRedirectAuth } from "@/hooks/useRedirectAuth";
+import { forceToDashboard, checkAuthRedirect } from "@/services/navigationService";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -28,14 +29,11 @@ type FormValues = z.infer<typeof formSchema>;
 
 const LoginPage = () => {
   const { login, loginWithGoogle, isAuthenticated, isLoading: authLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [processingOAuth, setProcessingOAuth] = useState(false);
-  const loginAttemptedRef = useRef(false);
   
-  const { forceToDashboard } = useRedirectAuth();
+  const { forceToDashboard: hookForceToDashboard } = useRedirectAuth();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -45,72 +43,34 @@ const LoginPage = () => {
     },
   });
 
+  // Direct session check on mount - the most critical check
   useEffect(() => {
-    const checkAuthWithFallbacks = async () => {
+    const checkAuth = async () => {
       try {
+        // First check if we need to redirect based on localStorage
+        if (await checkAuthRedirect()) {
+          return;
+        }
+        
         console.log("💡 LoginPage: Direct session check");
         const { data } = await supabase.auth.getSession();
         
         if (data.session) {
           console.log("💡 LoginPage: Direct session check found session");
-          
-          localStorage.setItem('auth_success', 'true');
-          localStorage.setItem('auth_timestamp', Date.now().toString());
-          
-          forceToDashboard();
-          
-          setTimeout(() => {
-            console.log("💡 LoginPage: Hard redirect fallback triggered");
-            window.location.href = '/dashboard';
-          }, 1000);
-          
-          return true;
+          forceToDashboard('login-page-mount');
         }
       } catch (error) {
-        console.error("💡 LoginPage: Error in direct session check:", error);
+        console.error("Error checking session in LoginPage:", error);
       }
-      
-      const authSuccess = localStorage.getItem('auth_success');
-      const authTimestamp = localStorage.getItem('auth_timestamp');
-      
-      if (authSuccess === 'true' && authTimestamp) {
-        const timestamp = parseInt(authTimestamp, 10);
-        const now = Date.now();
-        const fiveMinutesMs = 5 * 60 * 1000;
-        
-        if (now - timestamp < fiveMinutesMs) {
-          console.log("💡 LoginPage: Found recent auth success in localStorage");
-          forceToDashboard();
-          
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 1000);
-          
-          return true;
-        }
-      }
-      
-      return false;
     };
     
-    checkAuthWithFallbacks();
-    
-    const checkIntervals = [3000, 6000, 15000, 30000];
-    const timeouts = checkIntervals.map(interval => 
-      setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          checkAuthWithFallbacks();
-        }
-      }, interval)
-    );
-    
-    return () => {
-      timeouts.forEach(timeout => clearTimeout(timeout));
-    };
-  }, [forceToDashboard]);
+    checkAuth();
+  }, []);
 
+  // Handle OAuth hash if present
   useEffect(() => {
-    if (location.hash && location.hash.includes('access_token')) {
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
       console.log("💡 LoginPage: Detected OAuth hash, processing");
       setProcessingOAuth(true);
       
@@ -120,7 +80,6 @@ const LoginPage = () => {
           
           if (session) {
             console.log("💡 LoginPage: OAuth hash processed successfully");
-            
             localStorage.setItem('auth_success', 'true');
             localStorage.setItem('auth_timestamp', Date.now().toString());
             
@@ -129,11 +88,7 @@ const LoginPage = () => {
               description: "Welcome to MeetingMaster!",
             });
             
-            forceToDashboard();
-            
-            setTimeout(() => {
-              window.location.href = '/dashboard';
-            }, 1500);
+            forceToDashboard('login-page-oauth');
           } else {
             console.error("💡 LoginPage: Failed to process OAuth hash");
             setAuthError("Failed to complete authentication. Please try again.");
@@ -148,32 +103,29 @@ const LoginPage = () => {
       
       processHash();
     }
-  }, [location.hash, forceToDashboard]);
+  }, []);
 
+  // Handle form submission
   const onSubmit = async (data: FormValues) => {
     if (isSubmitting) return;
     
     setIsSubmitting(true);
     setAuthError(null);
-    loginAttemptedRef.current = true;
     
     try {
       console.log("💡 LoginPage: Attempting login with email:", data.email);
       
+      // Check if already authenticated first
       const { data: sessionData } = await supabase.auth.getSession();
       if (sessionData.session) {
         console.log("💡 LoginPage: Already authenticated, proceeding to dashboard");
         localStorage.setItem('auth_success', 'true');
         localStorage.setItem('auth_timestamp', Date.now().toString());
-        forceToDashboard();
-        
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 1000);
-        
+        forceToDashboard('login-page-already-auth');
         return;
       }
       
+      // Perform login
       const result = await login(data.email, data.password);
       
       if (result.error) {
@@ -181,19 +133,8 @@ const LoginPage = () => {
         throw result.error;
       }
       
-      console.log("💡 LoginPage: Login successful, ensure navigation");
-      
-      localStorage.setItem('auth_success', 'true');
-      localStorage.setItem('auth_timestamp', Date.now().toString());
-      
-      forceToDashboard();
-      
-      setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          console.log("💡 LoginPage: Still on login page, forcing hard redirect");
-          window.location.href = '/dashboard';
-        }
-      }, 1500);
+      console.log("💡 LoginPage: Login successful");
+      // Navigation is handled by the login function using the centralized service
       
     } catch (error) {
       console.error("💡 LoginPage: Login failed:", error);
@@ -226,19 +167,15 @@ const LoginPage = () => {
     }
   };
 
+  // Redirect if authenticated
   useEffect(() => {
     if (isAuthenticated && !processingOAuth) {
       console.log("💡 LoginPage: User is authenticated, redirecting");
-      forceToDashboard();
-      
-      setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          window.location.href = '/dashboard';
-        }
-      }, 1000);
+      forceToDashboard('login-page-is-authenticated');
     }
-  }, [isAuthenticated, processingOAuth, forceToDashboard]);
+  }, [isAuthenticated, processingOAuth]);
 
+  // Rendering based on state
   if (processingOAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">

@@ -7,6 +7,7 @@ import { useOAuthCallback } from "@/hooks/useOAuthCallback";
 import { useAuthState } from "@/hooks/useAuthState";
 import { useRedirectAuth } from "@/hooks/useRedirectAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { forceToDashboard, checkAuthRedirect } from "@/services/navigationService";
 
 // Initial context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,7 +36,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   // Use our reliable redirect hook for navigation
-  const { forceToDashboard, forceToLogin } = useRedirectAuth();
+  const { forceToDashboard: hookForceToDashboard, forceToLogin } = useRedirectAuth();
 
   // Get auth methods
   const {
@@ -60,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const handleLoginSuccess = () => {
       console.log("AuthContext: Detected login-success event");
-      forceToDashboard();
+      forceToDashboard('auth-context-event');
     };
     
     window.addEventListener('login-success', handleLoginSuccess);
@@ -68,23 +69,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       window.removeEventListener('login-success', handleLoginSuccess);
     };
-  }, [forceToDashboard]);
+  }, []);
 
   // Enhanced direct session check
   useEffect(() => {
     let isMounted = true;
     
-    // Hard redirect if we have a session but are on the login page
+    // Check for localStorage auth status first using the navigation service
+    checkAuthRedirect();
+    
+    // Direct session check for logged in users on login pages
     const checkSessionAndRedirect = async () => {
+      if (!isMounted) return;
+      
       try {
+        console.log("AuthContext: Direct session check starting");
         const { data } = await supabase.auth.getSession();
         
         if (data.session && isMounted) {
-          // If we have a session and we're on a login-related page, directly change the window location
+          // If we have a session and we're on a login-related page, redirect
           const currentPath = window.location.pathname;
           if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
-            console.log("🔒 AuthContext: Direct session check found session, performing hard redirect");
-            window.location.href = '/dashboard';
+            console.log("🔒 AuthContext: Direct session check found session, redirecting");
+            forceToDashboard('auth-context-session');
           }
         }
       } catch (err) {
@@ -92,17 +99,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     
-    // Run this check on initial load and periodically
+    // Run this check only once on mount
     checkSessionAndRedirect();
-    
-    // Schedule additional checks for the first minute
-    const intervals = [1000, 3000, 5000, 15000, 30000].map(delay => 
-      setTimeout(checkSessionAndRedirect, delay)
-    );
     
     return () => {
       isMounted = false;
-      intervals.forEach(interval => clearTimeout(interval));
     };
   }, []);
 

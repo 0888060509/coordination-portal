@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
+import { useEffect } from "react";
+import { checkAuthRedirect } from "./services/navigationService";
 
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
@@ -33,6 +35,49 @@ const queryClient = new QueryClient({
   },
 });
 
+// App router with root-level auth check
+const AppRouter = () => {
+  // Check auth status at the root level
+  useEffect(() => {
+    // Immediate check
+    checkAuthRedirect();
+    
+    // Schedule additional checks to catch delayed auth
+    const timeouts = [1000, 3000].map(delay => 
+      setTimeout(() => checkAuthRedirect(), delay)
+    );
+    
+    return () => timeouts.forEach(t => clearTimeout(t));
+  }, []);
+  
+  return (
+    <Routes>
+      {/* Auth Routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<UpdatePasswordPage />} />
+      
+      {/* Protected Routes */}
+      <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/rooms" element={<RoomsPage />} />
+        <Route path="/rooms/:id" element={<RoomDetailPage />} />
+        <Route path="/bookings" element={<BookingsPage />} />
+        <Route path="/bookings/:id" element={<BookingDetailPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+      </Route>
+      
+      {/* Redirects */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      
+      {/* 404 Route */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
@@ -40,30 +85,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <Routes>
-            {/* Auth Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<UpdatePasswordPage />} />
-            
-            {/* Protected Routes */}
-            <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/rooms" element={<RoomsPage />} />
-              <Route path="/rooms/:id" element={<RoomDetailPage />} />
-              <Route path="/bookings" element={<BookingsPage />} />
-              <Route path="/bookings/:id" element={<BookingDetailPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-            </Route>
-            
-            {/* Redirects */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AppRouter />
         </TooltipProvider>
       </AuthProvider>
     </BrowserRouter>

@@ -5,6 +5,7 @@ import { supabase, handleSupabaseError, storeOAuthState, processAuthHash } from 
 import { User } from "@/types/user";
 import { Session, AuthError } from "@supabase/supabase-js";
 import { fetchProfile } from "@/utils/userTransform";
+import { forceToDashboard } from "@/services/navigationService";
 
 /**
  * Hook that provides all auth methods
@@ -62,11 +63,9 @@ export const useAuthMethods = (
       
       console.log("🔑 Login: Successful, user ID:", data.user.id);
       
-      // STEP 2: Mark successful login globally
-      // This will be detected by useRedirectAuth hook
+      // STEP 2: Mark successful login globally using centralized approach
       localStorage.setItem('auth_success', 'true');
       localStorage.setItem('auth_timestamp', Date.now().toString());
-      localStorage.setItem('login_redirect_pending', 'true');
       
       // STEP 3: Set session and user data synchronously
       setSession(data.session);
@@ -90,15 +89,13 @@ export const useAuthMethods = (
         description: "Welcome back to MeetingMaster!",
       });
       
-      // New approach: Dispatch a custom event that will be caught by all relevant components
-      console.log("🔑 Login: Dispatching login-success event");
-      window.dispatchEvent(new CustomEvent('login-success', { 
-        detail: { userId: data.user.id }
-      }));
+      // STEP 6: Use the centralized navigation service for reliable redirection
+      console.log("🔑 Login: Redirecting to dashboard via navigation service");
       
-      // STEP 6: SIMPLE NAVIGATION - let the useRedirectAuth hook handle the redirection
-      // Just navigate once and let the other hook handle fallbacks
-      navigate('/dashboard', { replace: true });
+      // Use a short delay to ensure state updates have completed
+      setTimeout(() => {
+        forceToDashboard('login-function');
+      }, 100);
       
       // Clear loading state
       setTimeout(() => {
