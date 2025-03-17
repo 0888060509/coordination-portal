@@ -1,6 +1,7 @@
 
 import { supabase, handleSupabaseError } from '@/integrations/supabase/client';
 import { Booking, BookingWithDetails, CreateBookingData } from '@/types/booking';
+import { toast } from '@/hooks/use-toast';
 
 export const bookingService = {
   // Get all bookings for the current user
@@ -40,6 +41,10 @@ export const bookingService = {
       }
 
       console.log("Bookings data from Supabase:", bookingsData);
+
+      if (!bookingsData || bookingsData.length === 0) {
+        return [];
+      }
 
       // Get user profile separately since there's no direct FK relationship
       const { data: profileData, error: profileError } = await supabase
@@ -150,42 +155,46 @@ export const bookingService = {
 
       console.log("Prepared booking data:", booking);
 
-      // Use create_booking RPC function which handles conflict checking
-      const { data, error } = await supabase.rpc('create_booking', {
-        p_room_id: booking.room_id,
-        p_user_id: booking.user_id,
-        p_title: booking.title,
-        p_description: booking.description,
-        p_start_time: booking.start_time,
-        p_end_time: booking.end_time
-      });
-
-      if (error) {
-        console.error("Error creating booking:", error);
-        throw error;
-      }
-
-      console.log("Booking created, received ID:", data);
-
-      // The RPC function returns the booking ID
-      const bookingId = data as string;
-      
-      // Update the booking with additional fields
-      if (booking.meeting_type || booking.special_requests) {
-        console.log("Updating booking with additional details");
-        
-        const { error: updateError } = await supabase
-          .from('bookings')
-          .update({
-            meeting_type: booking.meeting_type,
-            special_requests: booking.special_requests
-          })
-          .eq('id', bookingId);
-
-        if (updateError) {
-          console.error('Error updating booking with additional details:', updateError);
+      // First check room availability
+      const { data: isAvailable, error: availabilityError } = await supabase.rpc(
+        'check_room_availability',
+        {
+          room_id: booking.room_id,
+          start_time: booking.start_time,
+          end_time: booking.end_time
         }
+      );
+
+      if (availabilityError) {
+        console.error("Error checking room availability:", availabilityError);
+        throw new Error(`Failed to check room availability: ${availabilityError.message}`);
       }
+
+      console.log("Room availability check result:", isAvailable);
+
+      if (!isAvailable) {
+        throw new Error('The room is not available during the selected time period');
+      }
+
+      // Direct insert instead of using RPC function if it's causing issues
+      const { data: newBooking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert([booking])
+        .select('id')
+        .single();
+
+      if (bookingError) {
+        console.error("Error creating booking:", bookingError);
+        throw new Error(`Failed to create booking: ${bookingError.message}`);
+      }
+
+      if (!newBooking) {
+        throw new Error('Failed to create booking: No ID returned');
+      }
+
+      console.log("Booking created successfully:", newBooking);
+      
+      const bookingId = newBooking.id;
 
       // If attendees are provided, add them
       if (bookingData.attendees && bookingData.attendees.length > 0) {
@@ -203,11 +212,17 @@ export const bookingService = {
 
         if (attendeesError) {
           console.error('Error adding booking attendees:', attendeesError);
+          // Don't fail the whole booking if attendees couldn't be added
+          toast({
+            title: "Booking created but with warnings",
+            description: "Room booked successfully, but there was an issue adding attendees.",
+            variant: "warning"
+          });
         }
       }
 
       return bookingId;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in createBooking:', error);
       throw error;
     }

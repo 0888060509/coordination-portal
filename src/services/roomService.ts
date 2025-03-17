@@ -56,11 +56,17 @@ export const roomService = {
 
       console.log("Rooms data from Supabase:", data);
 
+      if (!data || data.length === 0) {
+        return [];
+      }
+
       // Process the data to match our RoomWithAmenities type
       let rooms = data.map(room => {
         // Extract amenities from the nested structure
         const amenities = room.room_amenities 
-          ? room.room_amenities.map((ra: any) => ra.amenities).filter(Boolean)
+          ? room.room_amenities
+              .map((ra: any) => ra.amenities)
+              .filter(Boolean)
           : [];
         
         return {
@@ -75,6 +81,9 @@ export const roomService = {
       // Post-process for amenity filtering
       if (filters?.amenities && filters.amenities.length > 0) {
         rooms = rooms.filter(room => {
+          if (!Array.isArray(room.amenities) || room.amenities.length === 0) {
+            return false;
+          }
           const roomAmenityIds = room.amenities.map(a => a.id);
           return filters.amenities!.every(id => roomAmenityIds.includes(id));
         });
@@ -113,7 +122,7 @@ export const roomService = {
                 });
               
               if (error) {
-                console.error('Error checking room availability:', error);
+                console.error(`Error checking room ${room.id} availability:`, error);
                 return null;
               }
               
@@ -168,7 +177,9 @@ export const roomService = {
 
       // Process the data to match our RoomWithAmenities type
       const amenities = data.room_amenities 
-        ? data.room_amenities.map((ra: any) => ra.amenities).filter(Boolean)
+        ? data.room_amenities
+            .map((ra: any) => ra.amenities)
+            .filter(Boolean)
         : [];
       
       const room = {

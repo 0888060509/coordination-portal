@@ -41,6 +41,8 @@ const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
   };
   
   const handleBookRoom = () => {
+    console.log("Book room clicked", { isAuthenticated, user });
+    
     if (!isAuthenticated || !user) {
       toast({
         title: "Authentication required",
@@ -48,6 +50,25 @@ const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
         variant: "destructive"
       });
       navigate('/login');
+      return;
+    }
+    
+    // Validate date and time selection
+    if (!date) {
+      toast({
+        title: "Date required",
+        description: "Please select a date for your booking",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!startTime || !endTime) {
+      toast({
+        title: "Time required",
+        description: "Please select start and end times for your booking",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -84,19 +105,25 @@ const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
             </p>
           )}
           <div className="flex flex-wrap gap-2">
-            {room.amenities.slice(0, 3).map((amenity) => (
-              <Badge
-                key={amenity.id}
-                variant="outline"
-                className="flex items-center gap-1 text-xs"
-              >
-                {amenity.name}
-              </Badge>
-            ))}
-            {room.amenities.length > 3 && (
-              <Badge variant="outline" className="text-xs">
-                +{room.amenities.length - 3} more
-              </Badge>
+            {Array.isArray(room.amenities) && room.amenities.length > 0 ? (
+              <>
+                {room.amenities.slice(0, 3).map((amenity) => (
+                  <Badge
+                    key={amenity.id}
+                    variant="outline"
+                    className="flex items-center gap-1 text-xs"
+                  >
+                    {amenity.name}
+                  </Badge>
+                ))}
+                {room.amenities.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{room.amenities.length - 3} more
+                  </Badge>
+                )}
+              </>
+            ) : (
+              <Badge variant="outline" className="text-xs">No amenities</Badge>
             )}
           </div>
         </CardContent>
