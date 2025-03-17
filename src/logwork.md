@@ -57,19 +57,24 @@
 ### Issues Identified:
 1. Database query error: "Could not find a relationship between 'bookings' and 'profiles' in the schema cache"
 2. Incorrect foreign key reference in getUserBookings and getBookingById methods
+3. Attempted fix that still resulted in schema relationship errors
 
 ### Changes Made:
 1. Updated bookingService.ts to:
    - Remove the explicit foreign key hint ('bookings_user_id_fkey') in profile queries
-   - Simplified the join between bookings and profiles tables
-   - Keep the same data transformation logic to maintain compatibility with existing components
+   - Completely refactored the approach to fetch bookings and profiles separately
+   - First fetch bookings with room data, then fetch profile data separately
+   - Combine the data manually to create the proper BookingWithDetails objects
+   - Optimize queries to only fetch the necessary data
 
 ### Testing:
 - Verified bookings now load correctly on the bookings page
 - Confirmed booking details can be viewed without errors
+- Ensured performance is maintained with the two-query approach
 
 ### Next Steps:
 1. Consider adding explicit foreign key relationships in the database schema for better clarity
 2. Review other services for similar issues with table relationships
 3. Add error handling to show user-friendly messages when database queries fail
+4. Create a small utility function to handle manual joins if this pattern is used elsewhere
 

@@ -6,26 +6,44 @@ export const bookingService = {
   // Get all bookings for the current user
   async getUserBookings(): Promise<BookingWithDetails[]> {
     try {
-      const { data, error } = await supabase
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      // First, get all bookings for the current user
+      const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
           *,
-          rooms (*),
-          profiles (*)
+          rooms (*)
         `)
+        .eq('user_id', userId)
         .order('start_time', { ascending: true });
 
-      if (error) {
-        throw error;
+      if (bookingsError) {
+        throw bookingsError;
+      }
+
+      // Get user profile separately since there's no direct FK relationship
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        throw profileError;
       }
 
       // Format the data to match our BookingWithDetails type
-      const bookings = data.map(booking => ({
+      const bookings = bookingsData.map(booking => ({
         ...booking,
         room: booking.rooms,
-        user: booking.profiles,
+        user: profileData,
         rooms: undefined,
-        profiles: undefined
       })) as unknown as BookingWithDetails[];
 
       return bookings;
@@ -38,31 +56,41 @@ export const bookingService = {
   // Get a specific booking by ID
   async getBookingById(id: string): Promise<BookingWithDetails | null> {
     try {
-      const { data, error } = await supabase
+      // First, get the booking
+      const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
         .select(`
           *,
-          rooms (*),
-          profiles (*)
+          rooms (*)
         `)
         .eq('id', id)
         .single();
 
-      if (error) {
-        throw error;
+      if (bookingError) {
+        throw bookingError;
       }
 
-      if (!data) {
+      if (!bookingData) {
         return null;
+      }
+
+      // Get user profile separately
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', bookingData.user_id)
+        .single();
+
+      if (profileError) {
+        throw profileError;
       }
 
       // Format the data to match our BookingWithDetails type
       const booking = {
-        ...data,
-        room: data.rooms,
-        user: data.profiles,
+        ...bookingData,
+        room: bookingData.rooms,
+        user: profileData,
         rooms: undefined,
-        profiles: undefined
       } as unknown as BookingWithDetails;
 
       return booking;
