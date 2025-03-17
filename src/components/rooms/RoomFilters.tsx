@@ -37,8 +37,10 @@ const RoomFilters = () => {
   };
   
   const handleSortChange = (value: string) => {
-    const [sort_by, sort_direction] = value.split('-');
-    updateFilters({ sortBy: sort_by, sort_direction });
+    const [sortBy, sortDirection] = value.split('-');
+    // Only pass valid sortBy values that match the expected type
+    const validSortBy = sortBy as "name" | "capacity" | "capacity_asc";
+    updateFilters({ sortBy: validSortBy, sortDirection });
   };
   
   const handleReset = () => {
@@ -77,7 +79,7 @@ const RoomFilters = () => {
         <div className="space-y-2">
           <Label htmlFor="sort">Sort By</Label>
           <Select 
-            value={`${filters.sortBy}-${filters.sort_direction}`} 
+            value={`${filters.sortBy}-${filters.sortDirection || 'asc'}`} 
             onValueChange={handleSortChange}
           >
             <SelectTrigger id="sort">

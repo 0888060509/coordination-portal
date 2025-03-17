@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Box, Flex, Heading, Spacer, Button } from '@/components/ui/button';
+import { Box, Flex, Heading, Spacer } from '@/components/ui/box';
+import { Button } from '@/components/ui/button';
 
 interface PageHeaderProps {
   title: string;
@@ -22,9 +23,7 @@ const PageHeader = ({
   return (
     <Box
       as="header"
-      py={4}
-      px={6}
-      className="bg-background border-b border-border"
+      className="py-4 px-6 bg-background border-b border-border"
     >
       <Flex className="items-center">
         <Box>

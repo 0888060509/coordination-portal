@@ -25,3 +25,11 @@
 - Fixed menu component imports in Header component
 - Added useAuth alias in AuthContext for backwards compatibility
 - Fixed build errors related to missing exports and imports
+
+## 2023-08-15
+- Extended AuthContext with missing method signatures (login, register, etc.)
+- Added User type with necessary properties (firstName, lastName, role)
+- Created Box/Flex UI utility components for layout
+- Added useRooms hook for room data fetching
+- Fixed type errors in RoomFilters component
+- Added alias for useBookingContext to maintain compatibility

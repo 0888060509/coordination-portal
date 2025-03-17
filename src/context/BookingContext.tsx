@@ -359,7 +359,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
 }
 
-// Hook to use the booking context
+// Hook to use the booking context - Export as both names for compatibility
 export function useBooking() {
   const context = useContext(BookingContext);
   if (context === undefined) {
@@ -367,3 +367,6 @@ export function useBooking() {
   }
   return context;
 }
+
+// Alias for backward compatibility
+export const useBookingContext = useBooking;

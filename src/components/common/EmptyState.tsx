@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Box, Button } from "@/components/ui/button";
+import { Box } from "@/components/ui/box";
+import { Button } from "@/components/ui/button";
 import { Info } from "lucide-react";
 
 interface EmptyStateProps {
