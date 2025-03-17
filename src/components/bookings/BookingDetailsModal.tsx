@@ -24,7 +24,7 @@ import { Separator } from "@/components/ui/separator";
 interface BookingDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  booking: BookingWithDetails;
+  booking: BookingWithDetails | null;
   onCancelBooking: () => void;
 }
 
@@ -34,6 +34,25 @@ const BookingDetailsModal = ({
   booking,
   onCancelBooking,
 }: BookingDetailsModalProps) => {
+  // Add null check before accessing booking properties
+  if (!booking) {
+    return (
+      <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Booking Details</DialogTitle>
+            <DialogDescription>
+              Unable to load booking details
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+  
   const startTime = new Date(booking.start_time);
   const endTime = new Date(booking.end_time);
   const isPastBooking = new Date() > endTime;

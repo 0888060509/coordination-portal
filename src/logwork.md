@@ -92,3 +92,8 @@
 - Updated main.tsx to include BrowserRouter and AppProviders
 - Added ErrorBoundary to App component for better error handling
 - Fixed routing to use the correct DashboardPage component
+
+## 2023-08-26
+- Fixed error in BookingDetailsModal where it was trying to access properties on a null booking object
+- Added null checking to prevent "Cannot read properties of null" runtime errors
+- Improved error handling with a fallback UI when booking details aren't available
