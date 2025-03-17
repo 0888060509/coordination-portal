@@ -3,6 +3,11 @@
 
 ## Latest Updates
 
+### [Date: 2025-03-25] - Fixed Type Conversion Error in roomService.ts
+- Fixed type conversion error in the getRoomAmenities function
+- Properly extracted amenity objects from Supabase query response
+- Improved type safety with explicit type cast for amenity objects
+
 ### [Date: 2025-03-24] - Fixed TypeScript Type Error in roomService.ts
 - Fixed type error in getRoomAmenities function by properly casting the amenities data
 - Corrected the data extraction process to ensure proper typing of amenity objects
