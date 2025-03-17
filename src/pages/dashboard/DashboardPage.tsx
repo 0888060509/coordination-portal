@@ -67,7 +67,8 @@ export default function DashboardPage() {
       total: bookings.length,
       confirmed: bookings.filter((b) => b.status === 'confirmed').length,
       cancelled: bookings.filter((b) => b.status === 'cancelled').length,
-      pending: bookings.filter((b) => b.status === 'pending').length,
+      // We'll avoid filtering by 'pending' since it's not in the valid statuses
+      pending: 0,
     };
   }, [bookings]);
   
@@ -168,10 +169,11 @@ export default function DashboardPage() {
               </CardHeader>
               <Separator />
               <CardContent className="pt-4">
-                <BookingList
+                <BookingsList
                   bookings={upcomingBookings}
                   isLoading={isLoadingBookings}
                   emptyStateMessage="You have no upcoming bookings"
+                  onViewDetails={(booking) => navigate(`/bookings/${booking.id}`)}
                 />
               </CardContent>
             </Card>

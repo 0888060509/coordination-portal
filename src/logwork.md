@@ -74,3 +74,9 @@
 - Created useBookings hook to fetch user bookings
 - Updated import statements for RoomCard and BookingsList components
 - Fixed type errors related to named exports vs default exports
+
+## 2023-08-23
+- Fixed useBookings hook to properly use the user ID from auth state
+- Resolved type compatibility issues in getUserBookings function call
+- Updated DashboardPage to use BookingsList component correctly
+- Fixed status filtering in bookingStats calculation to match allowed status types
