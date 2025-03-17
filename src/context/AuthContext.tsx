@@ -6,6 +6,7 @@ import { useAuthMethods } from "@/hooks/useAuthMethods";
 import { useOAuthCallback } from "@/hooks/useOAuthCallback";
 import { useAuthState } from "@/hooks/useAuthState";
 import { useRedirectAuth } from "@/hooks/useRedirectAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 // Initial context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -68,6 +69,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener('login-success', handleLoginSuccess);
     };
   }, [forceToDashboard]);
+
+  // Enhanced direct session check
+  useEffect(() => {
+    let isMounted = true;
+    
+    // Hard redirect if we have a session but are on the login page
+    const checkSessionAndRedirect = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        
+        if (data.session && isMounted) {
+          // If we have a session and we're on a login-related page, directly change the window location
+          const currentPath = window.location.pathname;
+          if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+            console.log("🔒 AuthContext: Direct session check found session, performing hard redirect");
+            window.location.href = '/dashboard';
+          }
+        }
+      } catch (err) {
+        console.error("Error in direct session check:", err);
+      }
+    };
+    
+    // Run this check on initial load and periodically
+    checkSessionAndRedirect();
+    
+    // Schedule additional checks for the first minute
+    const intervals = [1000, 3000, 5000, 15000, 30000].map(delay => 
+      setTimeout(checkSessionAndRedirect, delay)
+    );
+    
+    return () => {
+      isMounted = false;
+      intervals.forEach(interval => clearTimeout(interval));
+    };
+  }, []);
 
   const value: AuthContextType = {
     user,

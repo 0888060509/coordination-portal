@@ -15,6 +15,7 @@ export function useRedirectAuth() {
   const redirecting = useRef(false);
   const checkInterval = useRef<NodeJS.Timeout | null>(null);
   const navigationTimeout = useRef<NodeJS.Timeout | null>(null);
+  const hardRedirectTried = useRef(false);
 
   // Function to force navigation to dashboard with multiple fallbacks
   const forceToDashboard = () => {
@@ -56,6 +57,31 @@ export function useRedirectAuth() {
         window.location.href = `${window.location.origin}/dashboard?forceReload=true`;
       }
     }, 1500);
+    
+    // Method 5: Extreme fallback - try a different technique after a longer delay
+    setTimeout(() => {
+      const currentPath = window.location.pathname;
+      if ((currentPath === '/login' || currentPath === '/register' || currentPath === '/') && !hardRedirectTried.current) {
+        console.log("🔐 FORCE NAVIGATION: Fallback 4 - iframe technique");
+        hardRedirectTried.current = true;
+        
+        // Create an iframe to force a navigation
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = `${window.location.origin}/dashboard?iframe=true`;
+        document.body.appendChild(iframe);
+        
+        // After iframe loads, do hard reload
+        iframe.onload = () => {
+          window.location.href = `${window.location.origin}/dashboard?hardReload=true`;
+        };
+        
+        // Fallback if iframe doesn't trigger
+        setTimeout(() => {
+          window.location.href = `${window.location.origin}/dashboard?finalFallback=true`;
+        }, 500);
+      }
+    }, 2500);
   };
 
   // Function to navigate to login
@@ -72,6 +98,13 @@ export function useRedirectAuth() {
       if (navigationTimeout.current) clearTimeout(navigationTimeout.current);
       
       navigate('/login', { replace: true });
+      
+      // Fallback navigation
+      setTimeout(() => {
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }, 500);
     }
   };
 
@@ -109,6 +142,12 @@ export function useRedirectAuth() {
     // Check if already on dashboard and set redirecting state accordingly
     if (location.pathname === '/dashboard') {
       redirecting.current = true;
+    } else {
+      // Reset the redirecting flag if we're not on dashboard
+      // This allows for fresh navigation attempts if the user somehow ended up
+      // back on the login page after a failed redirect
+      redirecting.current = false;
+      hardRedirectTried.current = false;
     }
     
     // Initial check from localStorage
@@ -118,7 +157,7 @@ export function useRedirectAuth() {
     
     // Check for active session directly
     const checkSession = async () => {
-      if (!isMounted || redirecting.current) return;
+      if (!isMounted || (redirecting.current && location.pathname === '/dashboard')) return;
       
       try {
         const { data } = await supabase.auth.getSession();
@@ -127,6 +166,9 @@ export function useRedirectAuth() {
           const currentPath = window.location.pathname;
           if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
             console.log("🔐 Active session detected, redirecting to dashboard");
+            // Store success in localStorage for other components
+            localStorage.setItem('auth_success', 'true');
+            localStorage.setItem('auth_timestamp', Date.now().toString());
             forceToDashboard();
           }
         } else {
@@ -145,7 +187,12 @@ export function useRedirectAuth() {
     checkSession();
     
     // Set up interval for continuous session checks
-    checkInterval.current = setInterval(checkSession, 1000);
+    checkInterval.current = setInterval(() => {
+      // Only check if we haven't successfully redirected or if we're not on the dashboard
+      if (location.pathname !== '/dashboard') {
+        checkSession();
+      }
+    }, 1000);
     
     // Set a hard timeout to stop checking after reasonable time
     navigationTimeout.current = setTimeout(() => {
@@ -157,7 +204,7 @@ export function useRedirectAuth() {
     
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isMounted || redirecting.current) return;
+      if (!isMounted) return;
       
       console.log("🔐 Auth state changed:", event, session ? "Session exists" : "No session");
       
@@ -167,6 +214,9 @@ export function useRedirectAuth() {
         
         const currentPath = window.location.pathname;
         if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+          // Reset flags to force a fresh navigation attempt
+          redirecting.current = false;
+          hardRedirectTried.current = false;
           forceToDashboard();
         }
         
@@ -180,6 +230,7 @@ export function useRedirectAuth() {
         localStorage.removeItem('auth_success');
         localStorage.removeItem('auth_timestamp');
         redirecting.current = false;
+        hardRedirectTried.current = false;
         
         toast({
           title: "Successfully signed out",
@@ -192,17 +243,32 @@ export function useRedirectAuth() {
     
     // Also listen for storage events (for cross-tab communication)
     const handleStorageChange = (e: StorageEvent) => {
-      if (!isMounted || redirecting.current) return;
+      if (!isMounted) return;
       
       if (e.key === 'auth_success' && e.newValue === 'true') {
         const currentPath = window.location.pathname;
         if (currentPath === '/login' || currentPath === '/register' || currentPath === '/') {
+          // Reset flags to allow a fresh navigation attempt
+          redirecting.current = false;
+          hardRedirectTried.current = false;
           forceToDashboard();
         }
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
+    
+    // Listen for special hash that might be added after redirects
+    if (window.location.hash === '#force_dashboard') {
+      console.log("🔐 Detected special navigation hash");
+      window.location.hash = '';
+      if (location.pathname !== '/dashboard') {
+        // Reset flags to allow a fresh navigation attempt
+        redirecting.current = false;
+        hardRedirectTried.current = false;
+        forceToDashboard();
+      }
+    }
     
     // Cleanup
     return () => {
