@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
+import AdminRoute from "./components/common/AdminRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 
@@ -24,6 +25,11 @@ import BookingDetailPage from "./pages/bookings/BookingDetailPage";
 import SettingsPage from "./pages/settings/SettingsPage";
 import ProfilePage from "./pages/settings/ProfilePage";
 import NotFound from "./pages/NotFound";
+
+// Admin Pages
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminRoomsPage from "./pages/admin/AdminRoomsPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +72,19 @@ const App = () => {
                   <Route path="/bookings/:id" element={<BookingDetailPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
+                </Route>
+                
+                {/* Admin Routes */}
+                <Route 
+                  element={
+                    <AdminRoute>
+                      <DashboardLayout />
+                    </AdminRoute>
+                  }
+                >
+                  <Route path="/admin" element={<AdminDashboardPage />} />
+                  <Route path="/admin/rooms" element={<AdminRoomsPage />} />
+                  <Route path="/admin/users" element={<AdminUsersPage />} />
                 </Route>
                 
                 {/* Redirects */}
