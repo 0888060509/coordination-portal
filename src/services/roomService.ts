@@ -1,21 +1,14 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { Room, RoomWithAmenities, Amenity } from '@/types/room';
+import { ApiService } from './apiService';
+import { supabase } from '../lib/supabase';
+import { Room, RoomWithAmenities, Amenity } from '../types/room';
+import { RoomDetails, TimeSlot, RoomFilters, AvailabilityCheckResult } from '../types/room.service';
 
-interface GetRoomsParams {
-  capacity?: number;
-  location?: string;
-  status?: 'available' | 'maintenance' | 'inactive';
-  amenities?: string[];
-  date?: Date | null;
-  startTime?: string;
-  endTime?: string;
-  sortBy?: 'name' | 'capacity' | 'capacity_asc';
-}
-
-// Get all rooms with optional filtering
-export const getRooms = async (params: GetRoomsParams = {}) => {
-  try {
+export class RoomService extends ApiService {
+  /**
+   * Get all rooms with optional filtering
+   */
+  async getAllRooms(filters?: RoomFilters): Promise<RoomWithAmenities[]> {
     let query = supabase
       .from('rooms')
       .select(`
@@ -24,35 +17,38 @@ export const getRooms = async (params: GetRoomsParams = {}) => {
           amenity:amenities(*)
         )
       `);
-
+    
     // Apply filters if provided
-    if (params) {
-      if (params.capacity) {
-        query = query.gte('capacity', params.capacity);
+    if (filters) {
+      if (filters.capacity && filters.capacity > 0) {
+        query = query.gte('capacity', filters.capacity);
       }
       
-      if (params.location) {
-        query = query.eq('location', params.location);
+      if (filters.location && filters.location !== '_all') {
+        query = query.eq('location', filters.location);
       }
       
-      if (params.status === 'available') {
+      if (filters.status === 'available') {
         query = query.eq('is_active', true);
-      } else if (params.status === 'inactive') {
+      } else if (filters.status === 'inactive') {
         query = query.eq('is_active', false);
       }
       
-      // More filters can be added as needed
+      // Sort results if specified
+      if (filters.sort_by) {
+        const direction = filters.sort_direction || 'asc';
+        query = query.order(filters.sort_by, { ascending: direction === 'asc' });
+      }
     }
-
+    
     const { data, error } = await query;
-
+    
     if (error) {
-      console.error('Error fetching rooms:', error);
-      return [];
+      this.handleError(error);
     }
-
+    
     // Process the nested data to flatten the amenities
-    const rooms = data.map((room) => {
+    return (data || []).map((room) => {
       const amenities = room.amenities
         ? room.amenities
             .map((a) => a.amenity)
@@ -65,17 +61,12 @@ export const getRooms = async (params: GetRoomsParams = {}) => {
         status: room.is_active ? 'available' : 'inactive',
       };
     });
-
-    return rooms;
-  } catch (error) {
-    console.error('Error in getRooms:', error);
-    return [];
   }
-};
 
-// Get a single room by ID
-export const getRoomById = async (roomId: string): Promise<Room | null> => {
-  try {
+  /**
+   * Get detailed information about a specific room
+   */
+  async getRoomById(id: string): Promise<RoomWithAmenities> {
     const { data, error } = await supabase
       .from('rooms')
       .select(`
@@ -84,16 +75,17 @@ export const getRoomById = async (roomId: string): Promise<Room | null> => {
           amenity:amenities(*)
         )
       `)
-      .eq('id', roomId)
+      .eq('id', id)
       .single();
-
+    
     if (error) {
-      console.error('Error fetching room:', error);
-      return null;
+      this.handleError(error);
     }
-
-    if (!data) return null;
-
+    
+    if (!data) {
+      throw new ApiError('Room not found', 404);
+    }
+    
     // Process the nested data to flatten the amenities
     const amenities = data.amenities
       ? data.amenities
@@ -101,66 +93,177 @@ export const getRoomById = async (roomId: string): Promise<Room | null> => {
           .filter(Boolean)
       : [];
     
-    const room = {
+    return {
       ...data,
       amenities,
       status: data.is_active ? 'available' : 'inactive',
     };
-
-    return room;
-  } catch (error) {
-    console.error('Error in getRoomById:', error);
-    return null;
   }
-};
 
-// Check room availability for a specific time range
-export const getRoomAvailability = async (roomId: string, startDate: Date, endDate: Date) => {
-  try {
-    // Convert dates to ISO strings
-    const startTimeISO = startDate.toISOString();
-    const endTimeISO = endDate.toISOString();
-
-    // Get all bookings for this room within the time range
-    const { data: bookings, error } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('room_id', roomId)
-      .eq('status', 'confirmed')
-      .or(`start_time.lte.${endTimeISO},end_time.gte.${startTimeISO}`);
-
-    if (error) {
-      console.error('Error checking room availability:', error);
-      throw error;
+  /**
+   * Check if a room is available for a specific time slot
+   */
+  async checkRoomAvailability(
+    roomId: string, 
+    startTime: Date, 
+    endTime: Date
+  ): Promise<AvailabilityCheckResult> {
+    try {
+      const { data, error } = await supabase
+        .rpc('check_room_availability', {
+          room_id: roomId,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString()
+        });
+      
+      if (error) {
+        this.handleError(error);
+      }
+      
+      // Get conflicting bookings if any
+      const { data: conflictingBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id, title, start_time, end_time')
+        .eq('room_id', roomId)
+        .eq('status', 'confirmed')
+        .or(`start_time.lte.${endTime.toISOString()},end_time.gte.${startTime.toISOString()}`);
+      
+      if (bookingsError) {
+        console.error('Error fetching conflicting bookings:', bookingsError);
+      }
+      
+      return {
+        is_available: data === true,
+        conflicting_bookings: conflictingBookings || []
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      this.handleError(error);
     }
-
-    // The room is available if there are no overlapping bookings
-    return {
-      available: bookings.length === 0,
-      conflictingBookings: bookings.length > 0 ? bookings : []
-    };
-  } catch (error) {
-    console.error('Error in getRoomAvailability:', error);
-    return { available: false };
   }
-};
 
-// Get popular rooms based on booking frequency
-export const getPopularRooms = async (limit = 5) => {
-  try {
-    // This would typically be a more complex query aggregating booking data
-    // For now, we'll just return the first few rooms
-    const rooms = await getRooms();
-    return rooms.slice(0, limit);
-  } catch (error) {
-    console.error('Error in getPopularRooms:', error);
-    return [];
+  /**
+   * Get all rooms available for a specific time slot
+   */
+  async getAvailableRooms(
+    startTime: Date,
+    endTime: Date,
+    filters?: RoomFilters
+  ): Promise<RoomWithAmenities[]> {
+    // First get all rooms matching the filters
+    const rooms = await this.getAllRooms(filters);
+    
+    // For each room, check availability
+    const availabilityChecks = await Promise.all(
+      rooms.map(async (room) => {
+        const availability = await this.checkRoomAvailability(
+          room.id,
+          startTime,
+          endTime
+        );
+        return {
+          room,
+          isAvailable: availability.is_available
+        };
+      })
+    );
+    
+    // Filter to only available rooms
+    return availabilityChecks
+      .filter(check => check.isAvailable)
+      .map(check => check.room);
   }
-};
 
-export default {
-  getRooms,
-  getRoomById,
-  getRoomAvailability,
-  getPopularRooms
-};
+  /**
+   * Get the availability schedule for a room over a date range
+   */
+  async getRoomAvailabilitySchedule(
+    roomId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<TimeSlot[]> {
+    try {
+      // Use the find_available_time_slots function
+      const { data, error } = await supabase
+        .rpc('find_available_time_slots', {
+          room_id: roomId,
+          date_to_check: startDate.toISOString().split('T')[0], // Just the date part
+          business_start_hour: 8,
+          business_end_hour: 18,
+          slot_duration_minutes: 60
+        });
+      
+      if (error) {
+        this.handleError(error);
+      }
+      
+      return data || [];
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get the most popular rooms based on booking frequency
+   */
+  async getPopularRooms(limit: number = 5): Promise<RoomWithAmenities[]> {
+    // This is a simple implementation - in a real app, you might 
+    // have a more complex query to calculate true popularity
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select(`
+          *,
+          amenities:room_amenities(
+            amenity:amenities(*)
+          ),
+          bookings:bookings(count)
+        `)
+        .eq('is_active', true)
+        .order('bookings.count', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        this.handleError(error);
+      }
+      
+      // Process the rooms
+      return (data || []).map((room) => {
+        const amenities = room.amenities
+          ? room.amenities
+              .map((a) => a.amenity)
+              .filter(Boolean)
+          : [];
+        
+        return {
+          ...room,
+          amenities,
+          status: room.is_active ? 'available' : 'inactive',
+        };
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      this.handleError(error);
+      return [];
+    }
+  }
+}
+
+// Export a singleton instance for use throughout the app
+export const roomService = new RoomService();
+
+// Export individual functions for more direct usage
+export const getRooms = (filters?: RoomFilters) => roomService.getAllRooms(filters);
+export const getRoomById = (id: string) => roomService.getRoomById(id);
+export const checkRoomAvailability = (roomId: string, startTime: Date, endTime: Date) => 
+  roomService.checkRoomAvailability(roomId, startTime, endTime);
+export const getRoomAvailability = (roomId: string, startDate: Date, endDate: Date) =>
+  roomService.getRoomAvailabilitySchedule(roomId, startDate, endDate);
+export const getPopularRooms = (limit?: number) => roomService.getPopularRooms(limit);
