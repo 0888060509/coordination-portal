@@ -1,4 +1,3 @@
-
 import { supabase, handleSupabaseError } from '@/integrations/supabase/client';
 import { Booking, BookingWithDetails, CreateBookingData } from '@/types/booking';
 import { toast } from '@/hooks/use-toast';
@@ -216,7 +215,7 @@ export const bookingService = {
           toast({
             title: "Booking created but with warnings",
             description: "Room booked successfully, but there was an issue adding attendees.",
-            variant: "warning"
+            variant: "destructive"
           });
         }
       }
