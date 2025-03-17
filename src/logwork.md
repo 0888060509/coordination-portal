@@ -33,3 +33,9 @@
 - Added useRooms hook for room data fetching
 - Fixed type errors in RoomFilters component
 - Added alias for useBookingContext to maintain compatibility
+
+## 2023-08-16
+- Fixed type errors in RoomFilters component by adding sortDirection to RoomFilterOptions
+- Added created_at field to amenity objects in useRooms hook
+- Fixed RoomsPage to properly pass isLoading prop to RoomList component
+- Updated RoomsPage to use RoomProvider for proper context integration

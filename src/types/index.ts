@@ -43,6 +43,7 @@ export interface RoomFilterOptions {
   searchQuery?: string;
   status?: RoomStatus;
   sortBy?: 'name' | 'capacity' | 'capacity_asc'; // Add sortBy property for sorting
+  sortDirection?: 'asc' | 'desc'; // Add sortDirection property
 }
 
 // Data for creating a new booking

@@ -13,9 +13,9 @@ const mockRooms: RoomWithAmenities[] = [
     image_url: 'https://picsum.photos/id/239/300/200',
     status: 'available',
     amenities: [
-      { id: '1', name: 'Projector', icon: 'projector' },
-      { id: '2', name: 'Video Conference', icon: 'video' },
-      { id: '3', name: 'Whiteboard', icon: 'whiteboard' },
+      { id: '1', name: 'Projector', icon: 'projector', created_at: new Date().toISOString() },
+      { id: '2', name: 'Video Conference', icon: 'video', created_at: new Date().toISOString() },
+      { id: '3', name: 'Whiteboard', icon: 'whiteboard', created_at: new Date().toISOString() },
     ],
   },
   {
@@ -27,8 +27,8 @@ const mockRooms: RoomWithAmenities[] = [
     image_url: 'https://picsum.photos/id/240/300/200',
     status: 'available',
     amenities: [
-      { id: '2', name: 'Video Conference', icon: 'video' },
-      { id: '3', name: 'Whiteboard', icon: 'whiteboard' },
+      { id: '2', name: 'Video Conference', icon: 'video', created_at: new Date().toISOString() },
+      { id: '3', name: 'Whiteboard', icon: 'whiteboard', created_at: new Date().toISOString() },
     ],
   },
   {
@@ -40,7 +40,7 @@ const mockRooms: RoomWithAmenities[] = [
     image_url: 'https://picsum.photos/id/241/300/200',
     status: 'maintenance',
     amenities: [
-      { id: '3', name: 'Whiteboard', icon: 'whiteboard' },
+      { id: '3', name: 'Whiteboard', icon: 'whiteboard', created_at: new Date().toISOString() },
     ],
   },
 ];

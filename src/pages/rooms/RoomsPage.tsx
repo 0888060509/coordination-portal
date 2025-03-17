@@ -6,6 +6,7 @@ import RoomFilters from '@/components/rooms/RoomFilters';
 import RoomSearch from '@/components/rooms/RoomSearch';
 import { useQuery } from '@tanstack/react-query';
 import { Amenity } from '@/types/room';
+import { RoomProvider } from '@/context/RoomContext';
 
 const RoomsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,42 +109,34 @@ const RoomsPage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between mb-8">
-        <h1 className="text-3xl font-bold mb-4 md:mb-0">Meeting Rooms</h1>
-        <RoomSearch onSearchChange={handleSearchChange} />
-      </div>
-      
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="lg:w-1/4">
-          <RoomFilters 
-            amenities={amenities}
-            locations={locations}
-            selectedAmenities={filterParams.amenities}
-            selectedLocation={filterParams.location}
-            onFilterChange={handleFilterChange}
-            onToggleAmenity={handleToggleAmenity}
-            onResetFilters={handleResetFilters}
-            viewType={viewType}
-            onViewTypeChange={handleViewTypeChange}
-          />
+    <RoomProvider>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col md:flex-row justify-between mb-8">
+          <h1 className="text-3xl font-bold mb-4 md:mb-0">Meeting Rooms</h1>
+          <RoomSearch onSearchChange={handleSearchChange} />
         </div>
         
-        <div className="lg:w-3/4">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : error ? (
-            <div className="text-red-500 p-4 bg-red-50 rounded-md">
-              Error loading rooms: {(error as Error).message}
-            </div>
-          ) : (
-            <RoomList rooms={filteredRooms} />
-          )}
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="lg:w-1/4">
+            <RoomFilters />
+          </div>
+          
+          <div className="lg:w-3/4">
+            {isLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
+            ) : error ? (
+              <div className="text-red-500 p-4 bg-red-50 rounded-md">
+                Error loading rooms: {(error as Error).message}
+              </div>
+            ) : (
+              <RoomList rooms={filteredRooms} isLoading={isLoading} />
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </RoomProvider>
   );
 };
 

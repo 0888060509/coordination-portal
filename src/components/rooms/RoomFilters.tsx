@@ -40,7 +40,10 @@ const RoomFilters = () => {
     const [sortBy, sortDirection] = value.split('-');
     // Only pass valid sortBy values that match the expected type
     const validSortBy = sortBy as "name" | "capacity" | "capacity_asc";
-    updateFilters({ sortBy: validSortBy, sortDirection });
+    updateFilters({ 
+      sortBy: validSortBy, 
+      sortDirection: sortDirection as 'asc' | 'desc' 
+    });
   };
   
   const handleReset = () => {
