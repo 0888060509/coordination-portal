@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -50,11 +49,12 @@ const RoomFilters = ({
   viewType,
   onViewTypeChange
 }: RoomFiltersProps) => {
-  const [sortBy, setSortBy] = useState<string>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'capacity' | 'capacity_asc'>('name');
 
   const handleSortChange = (value: string) => {
-    setSortBy(value);
-    onFilterChange({ sortBy: value });
+    const typedValue = value as 'name' | 'capacity' | 'capacity_asc';
+    setSortBy(typedValue);
+    onFilterChange({ sortBy: typedValue });
   };
 
   const handleLocationChange = (value: string) => {
@@ -82,11 +82,9 @@ const RoomFilters = ({
     </div>
   );
   
-  // Desktop filters
   const DesktopFilters = () => (
     <div className="hidden md:flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-3 rounded-md mb-4">
       <div className="flex items-center gap-4">
-        {/* Location filter */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Location:</span>
           <Select value={selectedLocation} onValueChange={handleLocationChange}>
@@ -104,7 +102,6 @@ const RoomFilters = ({
           </Select>
         </div>
         
-        {/* Sort by */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Sort by:</span>
           <Select value={sortBy} onValueChange={handleSortChange}>
@@ -119,7 +116,6 @@ const RoomFilters = ({
           </Select>
         </div>
         
-        {/* Amenities popover */}
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm">
@@ -174,7 +170,6 @@ const RoomFilters = ({
     </div>
   );
   
-  // Mobile filters (drawer)
   const MobileFilters = () => (
     <div className="md:hidden flex items-center justify-between mb-4">
       <Drawer>
@@ -197,7 +192,6 @@ const RoomFilters = ({
             </DrawerDescription>
           </DrawerHeader>
           <div className="px-4 py-2 space-y-4">
-            {/* Location filter */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Location</label>
               <Select value={selectedLocation} onValueChange={handleLocationChange}>
@@ -215,7 +209,6 @@ const RoomFilters = ({
               </Select>
             </div>
             
-            {/* Sort by */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Sort by</label>
               <Select value={sortBy} onValueChange={handleSortChange}>
@@ -230,7 +223,6 @@ const RoomFilters = ({
               </Select>
             </div>
             
-            {/* Amenities filter */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Amenities</label>
               <div className="space-y-2 max-h-60 overflow-y-auto">
