@@ -67,3 +67,13 @@ The issue was caused by a mismatch between the props defined in the PageHeader c
 - Fixed z-index issues that might have been hiding content
 
 The issue was that the dashboard content wasn't being displayed properly due to layout structure issues in the AppLayout component. The fix ensures that the content area properly renders the Outlet component from React Router, which contains the page-specific content.
+
+## 2025-03-19: Fixed Content Not Displaying on All Pages
+
+- Fixed notifications component to use authenticated user ID instead of hardcoded "123"
+- Added proper error handling for when user is not authenticated
+- Updated AppLayout component to ensure proper content rendering
+- Improved layout structure with better CSS classes
+- Added debug logging to help identify issues with data fetching
+
+The issue was that content wasn't displaying on any pages due to SQL errors from using hardcoded user IDs ("123") in database queries instead of the authenticated user's ID. This caused database operations to fail and prevent content from being rendered. The fix ensures proper authentication checks and uses the actual user ID in all database operations.

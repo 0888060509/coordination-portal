@@ -1,10 +1,17 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Notification, NotificationType, BookingWithDetails } from "@/types/booking";
 
 // Get notifications for the current user
 export const fetchNotifications = async (userId: string) => {
+  if (!userId) {
+    console.log("No user ID provided for fetchNotifications");
+    return [];
+  }
+
   try {
+    console.log(`Fetching notifications for user: ${userId}`);
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
@@ -308,8 +315,16 @@ export const subscribeToNotifications = (
   userId: string, 
   onNotification: (notification: Notification) => void
 ) => {
+  if (!userId) {
+    console.error("No user ID provided for notification subscription");
+    return {
+      unsubscribe: () => {}
+    };
+  }
+
+  console.log(`Subscribing to notifications for user: ${userId}`);
   return supabase
-    .channel('notifications-channel')
+    .channel(`notifications-channel-${userId}`)
     .on(
       'postgres_changes',
       {
@@ -319,6 +334,7 @@ export const subscribeToNotifications = (
         filter: `user_id=eq.${userId}`
       },
       (payload) => {
+        console.log("New notification received:", payload);
         onNotification(payload.new as Notification);
       }
     )

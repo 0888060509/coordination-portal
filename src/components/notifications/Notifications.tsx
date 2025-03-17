@@ -66,30 +66,45 @@ const Notifications = () => {
   );
 
   useEffect(() => {
-    if (!user) return;
+    // Only fetch notifications if user is authenticated
+    if (!user?.id) {
+      console.log("User not authenticated, skipping notification fetch");
+      return;
+    }
 
+    console.log("Fetching notifications for user:", user.id);
+    
     // Load initial notifications
     const loadNotifications = async () => {
-      const data = await notificationService.fetchNotifications(user.id);
-      setNotifications(data);
+      try {
+        const data = await notificationService.fetchNotifications(user.id);
+        setNotifications(data);
+      } catch (error) {
+        console.error("Failed to load notifications:", error);
+      }
     };
 
     loadNotifications();
 
-    // Subscribe to real-time updates
-    const subscription = notificationService.subscribeToNotifications(
-      user.id,
-      (newNotification) => {
-        setNotifications(prev => [newNotification, ...prev]);
-      }
-    );
+    // Subscribe to real-time updates if user is authenticated
+    const subscription = user.id ? 
+      notificationService.subscribeToNotifications(
+        user.id,
+        (newNotification) => {
+          setNotifications(prev => [newNotification, ...prev]);
+        }
+      ) : null;
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
-  }, [user]);
+  }, [user?.id]);
 
   const handleMarkAsRead = async (id: string) => {
+    if (!user?.id) return;
+    
     await notificationService.markNotificationAsRead(id);
     setNotifications(prev => 
       prev.map(n => n.id === id ? { ...n, is_read: true } : n)
@@ -97,14 +112,16 @@ const Notifications = () => {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (!user) return;
+    if (!user?.id) return;
+    
     await notificationService.markAllNotificationsAsRead(user.id);
     setNotifications(prev => 
       prev.map(n => ({ ...n, is_read: true }))
     );
   };
 
-  if (!user) return null;
+  // Don't render anything if user is not authenticated
+  if (!user?.id) return null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

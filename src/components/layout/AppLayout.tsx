@@ -11,16 +11,22 @@ const AppLayout = () => {
   const navigate = useNavigate();
   
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Sidebar */}
       <Sidebar />
+      
+      {/* Main content */}
       <main
         className={cn(
-          "flex-1 transition-all duration-200 h-screen overflow-auto",
+          "flex-1 flex flex-col transition-all duration-200 h-screen overflow-auto",
           uiState.sidebarOpen ? "ml-60" : "ml-[70px]"
         )}
       >
+        {/* Header */}
         <Header />
-        <div className="pt-16 min-h-[calc(100vh-4rem)]">
+        
+        {/* Page content */}
+        <div className="flex-1 p-0 pt-16 w-full">
           <Outlet />
         </div>
       </main>
