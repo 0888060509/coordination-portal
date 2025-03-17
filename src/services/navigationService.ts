@@ -7,7 +7,10 @@
 // Track redirection state to prevent multiple attempts
 let redirectionInProgress = false;
 let lastRedirectTime = 0;
-let redirectionCooldown = 2000; // 2 seconds cooldown between redirects
+let redirectionCooldown = 3000; // 3 seconds cooldown between redirects
+
+// Debug flag to trace navigation issues
+const DEBUG_NAVIGATION = true;
 
 /**
  * Force navigation to dashboard using direct window.location
@@ -17,21 +20,27 @@ export const forceToDashboard = (source: string = 'unknown') => {
   const currentTime = Date.now();
   const currentPath = window.location.pathname;
   
-  // Only redirect if we're not already on dashboard and not in cooldown period
+  // Prevent potential loops by checking if we're already on dashboard
   if (currentPath === '/dashboard') {
-    console.log(`🚀 NAVIGATION: Already on dashboard (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Already on dashboard (requested by ${source})`);
+    }
     return false;
   }
   
   // Prevent multiple redirects in rapid succession
   if (redirectionInProgress) {
-    console.log(`🚀 NAVIGATION: Redirection already in progress (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Redirection already in progress (requested by ${source})`);
+    }
     return false;
   }
   
-  // Check for cooldown
+  // Check for cooldown to prevent redirect loops
   if (currentTime - lastRedirectTime < redirectionCooldown) {
-    console.log(`🚀 NAVIGATION: In cooldown period (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`⏱️ NAVIGATION: In cooldown period (requested by ${source}), waiting ${redirectionCooldown}ms`);
+    }
     return false;
   }
   
@@ -39,14 +48,18 @@ export const forceToDashboard = (source: string = 'unknown') => {
   redirectionInProgress = true;
   lastRedirectTime = currentTime;
   
-  console.log(`🚀 NAVIGATION: Forcing navigation to dashboard (requested by ${source})`);
+  if (DEBUG_NAVIGATION) {
+    console.log(`🚀 NAVIGATION: Forcing navigation to dashboard (requested by ${source})`);
+  }
   
   // Store successful auth in localStorage for other components to detect
   localStorage.setItem('auth_success', 'true');
   localStorage.setItem('auth_timestamp', currentTime.toString());
   
   // Direct location change for most reliable redirection
-  window.location.href = '/dashboard';
+  if (window.location.pathname !== '/dashboard') {
+    window.location.href = '/dashboard';
+  }
   
   // Reset flag after a delay
   setTimeout(() => {
@@ -64,21 +77,27 @@ export const forceToLogin = (source: string = 'unknown') => {
   const currentTime = Date.now();
   const currentPath = window.location.pathname;
   
-  // Only redirect if we're not already on login and not in cooldown period
+  // Prevent potential loops by checking if we're already on login
   if (currentPath === '/login') {
-    console.log(`🚀 NAVIGATION: Already on login (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Already on login (requested by ${source})`);
+    }
     return false;
   }
   
   // Prevent multiple redirects in rapid succession
   if (redirectionInProgress) {
-    console.log(`🚀 NAVIGATION: Redirection already in progress (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Redirection already in progress (requested by ${source})`);
+    }
     return false;
   }
   
-  // Check for cooldown
+  // Check for cooldown to prevent redirect loops
   if (currentTime - lastRedirectTime < redirectionCooldown) {
-    console.log(`🚀 NAVIGATION: In cooldown period (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`⏱️ NAVIGATION: In cooldown period (requested by ${source}), waiting ${redirectionCooldown}ms`);
+    }
     return false;
   }
   
@@ -86,14 +105,18 @@ export const forceToLogin = (source: string = 'unknown') => {
   redirectionInProgress = true;
   lastRedirectTime = currentTime;
   
-  console.log(`🚀 NAVIGATION: Forcing navigation to login (requested by ${source})`);
+  if (DEBUG_NAVIGATION) {
+    console.log(`🚀 NAVIGATION: Forcing navigation to login (requested by ${source})`);
+  }
   
   // Clear auth-related localStorage
   localStorage.removeItem('auth_success');
   localStorage.removeItem('auth_timestamp');
   
   // Direct location change for most reliable redirection
-  window.location.href = '/login';
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
   
   // Reset flag after a delay
   setTimeout(() => {
@@ -108,6 +131,15 @@ export const forceToLogin = (source: string = 'unknown') => {
  * This is a utility function that can be called from any component
  */
 export const checkAuthRedirect = async () => {
+  // Prevent redirect loops by adding a cooldown mechanism
+  const currentTime = Date.now();
+  if (currentTime - lastRedirectTime < redirectionCooldown) {
+    if (DEBUG_NAVIGATION) {
+      console.log(`⏱️ NAVIGATION: checkAuthRedirect in cooldown period, skipping`);
+    }
+    return false;
+  }
+  
   const authSuccess = localStorage.getItem('auth_success');
   const authTimestamp = localStorage.getItem('auth_timestamp');
   const currentPath = window.location.pathname;
@@ -148,21 +180,27 @@ export const navigateTo = (route: string, source: string = 'unknown') => {
   const currentTime = Date.now();
   const currentPath = window.location.pathname;
   
-  // Only navigate if we're not already on the route and not in cooldown period
+  // Prevent navigation to the same route
   if (currentPath === route) {
-    console.log(`🚀 NAVIGATION: Already on ${route} (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Already on ${route} (requested by ${source})`);
+    }
     return false;
   }
   
   // Prevent multiple navigations in rapid succession
   if (redirectionInProgress) {
-    console.log(`🚀 NAVIGATION: Navigation already in progress (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`🛑 NAVIGATION: Navigation already in progress (requested by ${source})`);
+    }
     return false;
   }
   
-  // Check for cooldown
+  // Check for cooldown to prevent navigation loops
   if (currentTime - lastRedirectTime < redirectionCooldown) {
-    console.log(`🚀 NAVIGATION: In cooldown period (requested by ${source})`);
+    if (DEBUG_NAVIGATION) {
+      console.log(`⏱️ NAVIGATION: In cooldown period (requested by ${source}), waiting ${redirectionCooldown}ms`);
+    }
     return false;
   }
   
@@ -170,7 +208,9 @@ export const navigateTo = (route: string, source: string = 'unknown') => {
   redirectionInProgress = true;
   lastRedirectTime = currentTime;
   
-  console.log(`🚀 NAVIGATION: Navigating to ${route} (requested by ${source})`);
+  if (DEBUG_NAVIGATION) {
+    console.log(`🚀 NAVIGATION: Navigating to ${route} (requested by ${source})`);
+  }
   
   // Direct location change for reliable navigation
   window.location.href = route;

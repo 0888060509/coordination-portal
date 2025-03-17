@@ -1,4 +1,3 @@
-
 import { ReactNode, useEffect, useState, useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -27,23 +26,31 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     };
   }, []);
 
-  // Check for auth success in localStorage
   useEffect(() => {
-    const authSuccess = localStorage.getItem('auth_success');
-    if (authSuccess === 'true') {
-      console.log("Found auth success in localStorage");
-    }
-  }, []);
+    console.log("ProtectedRoute state:", { 
+      isAuthenticated, 
+      isLoading, 
+      authInitialized,
+      forceRenderContent,
+      authTimeout,
+      path: location.pathname
+    });
+  }, [isAuthenticated, isLoading, authInitialized, forceRenderContent, authTimeout, location.pathname]);
   
-  // Force render content after a reasonable timeout to prevent infinite loading
   useEffect(() => {
-    // If we're still loading after 5 seconds, force render content
-    loadingTimeoutRef.current = setTimeout(() => {
-      if (isMountedRef.current && isLoading) {
-        console.log("ProtectedRoute: Force rendering content after timeout");
-        setForceRenderContent(true);
-      }
-    }, 5000);
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    
+    if (isLoading) {
+      loadingTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          console.log("ProtectedRoute: Force rendering content after timeout");
+          setForceRenderContent(true);
+        }
+      }, 3000);
+    }
     
     return () => {
       if (loadingTimeoutRef.current) {
@@ -52,16 +59,16 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     };
   }, [isLoading]);
 
-  // Show authentication timeout after 10 seconds of loading
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     
     if (isLoading) {
       timer = setTimeout(() => {
         if (isMountedRef.current) {
+          console.log("ProtectedRoute: Setting auth timeout");
           setAuthTimeout(true);
         }
-      }, 10000);
+      }, 5000);
     }
     
     return () => {
@@ -70,7 +77,9 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   }, [isLoading]);
 
   const goToLogin = () => {
+    console.log("ProtectedRoute: Manually navigating to login");
     localStorage.removeItem('auth_success');
+    
     toast({
       title: "Going back to login",
       description: "Please try signing in again.",
@@ -79,12 +88,21 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     window.location.href = '/login';
   };
 
-  // Show the children if we're authenticated or need to force render to prevent deadlock
+  if (authInitialized && !isAuthenticated && !isLoading && !forceRenderContent) {
+    console.log("ProtectedRoute: Not authenticated, redirecting to login");
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (isAuthenticated && requiredRole === "admin" && !isAdmin) {
+    console.log("ProtectedRoute: Not admin, redirecting to dashboard");
+    return <Navigate to="/dashboard" replace />;
+  }
+
   if (isAuthenticated || forceRenderContent) {
+    console.log("ProtectedRoute: Rendering protected content");
     return <>{children}</>;
   }
 
-  // Standard loading state
   if (isLoading && !forceRenderContent) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
@@ -114,16 +132,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     );
   }
 
-  // If not authenticated and not loading, redirect to login
-  if (!isAuthenticated && authInitialized) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (requiredRole === "admin" && !isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  // Default case - show the children
+  console.log("ProtectedRoute: Default case - showing children");
   return <>{children}</>;
 };
 

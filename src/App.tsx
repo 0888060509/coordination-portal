@@ -7,8 +7,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
-import { useEffect } from "react";
-import { checkAuthRedirect } from "./services/navigationService";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 
 // Auth Pages
@@ -38,29 +36,16 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  // Check auth status at the root level
-  useEffect(() => {
-    // Immediate check
-    checkAuthRedirect();
-    
-    // Schedule additional checks to catch delayed auth
-    const timeouts = [1000, 3000].map(delay => 
-      setTimeout(() => checkAuthRedirect(), delay)
-    );
-    
-    return () => timeouts.forEach(t => clearTimeout(t));
-  }, []);
-  
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <TooltipProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <TooltipProvider>
+            <AuthProvider>
               <Toaster />
               <Sonner />
               <Routes>
-                {/* Auth Routes */}
+                {/* Public Auth Routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -89,10 +74,10 @@ const App = () => {
                 {/* 404 Route */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </TooltipProvider>
-          </AuthProvider>
-        </QueryClientProvider>
-      </BrowserRouter>
+            </AuthProvider>
+          </TooltipProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 };

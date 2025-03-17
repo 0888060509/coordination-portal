@@ -31,7 +31,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log the error to console for debugging
-    console.error("MeetingMaster Error Caught:", error);
+    console.error("MeetingMaster Error Caught by Boundary:", error);
     console.error("Component Stack:", errorInfo.componentStack);
     
     // Update state to include error info
@@ -40,34 +40,39 @@ class ErrorBoundary extends Component<Props, State> {
 
   resetErrorBoundary = (): void => {
     this.setState({ hasError: false, error: null, errorInfo: null });
-    // Attempt to reload the application
-    window.location.href = '/dashboard';
+    
+    // Clear any potential auth state that might be causing loops
+    localStorage.removeItem('auth_success');
+    localStorage.removeItem('auth_timestamp');
+    
+    // Redirect to login page instead of dashboard to break potential loops
+    window.location.href = '/login';
   }
 
   render(): ReactNode {
     if (this.state.hasError) {
-      // You can render any custom fallback UI
+      // Custom fallback UI
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
           <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
             <div className="flex flex-col items-center">
               <AlertTriangle className="h-16 w-16 text-amber-500 mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Oops, something went wrong</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">App Error Detected</h1>
               <p className="text-gray-600 text-center mb-4">
-                MeetingMaster encountered an unexpected error. Please try refreshing the page.
+                MeetingMaster encountered an error that prevented it from loading correctly.
               </p>
               <div className="flex space-x-4">
                 <Button 
                   onClick={this.resetErrorBoundary}
                   variant="default"
                 >
-                  Reload Application
+                  Reset & Logout
                 </Button>
                 <Button 
-                  onClick={() => window.location.href = '/login'}
+                  onClick={() => window.location.reload()}
                   variant="outline"
                 >
-                  Go to Login
+                  Reload Page
                 </Button>
               </div>
               
