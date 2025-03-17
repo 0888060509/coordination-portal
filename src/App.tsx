@@ -11,6 +11,7 @@ import BookingsPage from './pages/bookings/BookingsPage';
 import { useAuth } from '@/context/AuthContext';
 import { EditBooking } from '@/components/bookings';
 import NotFound from './pages/NotFoundPage';
+import IndexPage from './pages/IndexPage';
 
 const App = () => {
   const { theme } = useTheme();
@@ -34,7 +35,7 @@ const App = () => {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="/" element={<IndexPage />} />
         
         {/* Auth Routes */}
         <Route path="/login" element={<Login />} />

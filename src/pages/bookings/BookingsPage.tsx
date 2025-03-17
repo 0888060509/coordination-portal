@@ -4,7 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import NavItem from "@/components/layout/NavItem";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LogOut, User } from "lucide-react";
+import { BookOpen, Calendar, Home, LogOut, SettingsIcon, User, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,8 +24,8 @@ const BookingsPage = () => {
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   
-  const userInitials = user?.first_name && user?.last_name
-    ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
+  const userInitials = user?.firstName && user?.lastName
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
     : "U";
   
   const handleLogout = async () => {
@@ -56,18 +56,21 @@ const BookingsPage = () => {
                   <NavItem
                     to="/dashboard"
                     isActive={location.pathname === '/dashboard'}
+                    icon={<Home size={18} />}
                   >
                     Dashboard
                   </NavItem>
                   <NavItem
                     to="/rooms"
                     isActive={location.pathname === '/rooms'}
+                    icon={<BookOpen size={18} />}
                   >
                     Rooms
                   </NavItem>
                   <NavItem
                     to="/bookings"
                     isActive={location.pathname === '/bookings'}
+                    icon={<Calendar size={18} />}
                   >
                     My Bookings
                   </NavItem>
@@ -83,18 +86,21 @@ const BookingsPage = () => {
                     <NavItem
                       to="/admin"
                       isActive={location.pathname === '/admin'}
+                      icon={<SettingsIcon size={18} />}
                     >
                       Dashboard
                     </NavItem>
                     <NavItem
                       to="/admin/rooms"
                       isActive={location.pathname === '/admin/rooms'}
+                      icon={<BookOpen size={18} />}
                     >
                       Room Management
                     </NavItem>
                     <NavItem
                       to="/admin/users"
                       isActive={location.pathname === '/admin/users'}
+                      icon={<Users size={18} />}
                     >
                       User Management
                     </NavItem>
@@ -109,11 +115,11 @@ const BookingsPage = () => {
               <div className="rounded-md bg-gray-100 p-3 dark:bg-gray-800">
                 <div className="flex items-center space-x-3">
                   <Avatar>
-                    <AvatarImage src={user?.avatar_url} alt={`${user?.first_name} ${user?.last_name}`} />
+                    <AvatarImage src={user?.avatarUrl} alt={`${user?.firstName} ${user?.lastName}`} />
                     <AvatarFallback>{userInitials}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-medium">{user?.first_name} {user?.last_name}</p>
+                    <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {user?.email}
                     </p>

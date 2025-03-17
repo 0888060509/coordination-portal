@@ -15,8 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { getBookingById, updateBooking } from "@/services/bookingService";
-import { getRoomById } from "@/services/roomService";
+import { getBooking, updateBooking } from "@/services/bookingService";
+import { getRoom } from "@/services/roomService";
 import { BookingWithDetails } from "@/types/booking";
 import { Room } from "@/types/room";
 import { useAuth } from "@/context/AuthContext";
@@ -51,7 +51,7 @@ const EditBooking: React.FC = () => {
       
       try {
         setIsLoading(true);
-        const fetchedBooking = await getBookingById(bookingId);
+        const fetchedBooking = await getBooking(bookingId);
         
         if (!fetchedBooking) {
           toast.error("Booking not found");
@@ -60,7 +60,7 @@ const EditBooking: React.FC = () => {
         }
         
         // Check if the current user is the booking owner
-        if (user && fetchedBooking.user_id !== user.id && !user.role === "admin") {
+        if (user && fetchedBooking.user_id !== user.id && user.role !== "admin") {
           toast.error("You don't have permission to edit this booking");
           navigate("/bookings");
           return;
@@ -69,7 +69,7 @@ const EditBooking: React.FC = () => {
         setBooking(fetchedBooking);
         
         // Fetch room details
-        const fetchedRoom = await getRoomById(fetchedBooking.room_id);
+        const fetchedRoom = await getRoom(fetchedBooking.room_id);
         setRoom(fetchedRoom);
         
         // Setup form values

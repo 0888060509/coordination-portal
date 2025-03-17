@@ -17,14 +17,24 @@ export interface UserProfile {
   updated_at: string;
 }
 
-export interface BookingWithDetails extends Omit<Booking, 'rooms' | 'profiles'> {
+export interface BookingWithDetails {
+  id: string;
+  room_id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  status: 'confirmed' | 'cancelled' | 'completed';
+  created_at: string;
+  updated_at: string;
+  recurring_pattern_id?: string;
   room: Room;
   user: UserProfile;
   attendees?: string[];
   equipment_needed?: string[];
   special_requests?: string;
   meeting_type?: string;
-  recurring_pattern_id?: string;
 }
 
 export interface CreateBookingData {
