@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { format } from 'date-fns';
 import { BookingWithDetails } from '@/types/booking';
@@ -6,7 +7,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { MapPin, Clock, Calendar, ExternalLink, Edit, XCircle } from 'lucide-react';
-import { getUserBookings } from '@/services/bookingService';
 
 interface BookingsListProps {
   bookings: BookingWithDetails[];
@@ -36,7 +36,7 @@ const BookingsList: React.FC<BookingsListProps> = ({
               <CardTitle className="text-sm font-medium">
                 {booking.title}
               </CardTitle>
-              <Badge variant="secondary">
+              <Badge variant={booking.status === 'cancelled' ? 'destructive' : 'secondary'}>
                 {booking.status}
               </Badge>
             </CardHeader>
@@ -52,12 +52,12 @@ const BookingsList: React.FC<BookingsListProps> = ({
                 </div>
                 <div className="flex items-center">
                   <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
-                  <span>{booking.room?.name}, {booking.room?.location}</span>
+                  <span>{booking.room?.name || 'Unknown Room'}, {booking.room?.location || 'Unknown Location'}</span>
                 </div>
               </div>
               <Separator className="my-4" />
               <p className="text-sm text-muted-foreground">
-                {booking.description}
+                {booking.description || 'No description provided'}
               </p>
             </CardContent>
             <CardFooter className="flex justify-between">
@@ -66,13 +66,13 @@ const BookingsList: React.FC<BookingsListProps> = ({
                 View Details
               </Button>
               <div className="flex gap-2">
-                {onEdit && (
+                {onEdit && new Date(booking.start_time) > new Date() && booking.status !== 'cancelled' && (
                   <Button onClick={() => onEdit(booking)}>
                     <Edit className="w-4 h-4 mr-2" />
                     Edit
                   </Button>
                 )}
-                {onCancel && (
+                {onCancel && new Date(booking.start_time) > new Date() && booking.status !== 'cancelled' && (
                   <Button variant="destructive" onClick={() => onCancel(booking)}>
                     <XCircle className="w-4 h-4 mr-2" />
                     Cancel

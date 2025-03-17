@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { BookingWithDetails } from '@/types/booking';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,12 +9,12 @@ import { useToast } from '@/components/ui/use-toast';
 import BookingsList from './BookingsList';
 import BookingDetailsModal from './BookingDetailsModal';
 import CancelBookingModal from './CancelBookingModal';
-import { Search, ListFilter, CalendarClock, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Search, ListFilter, CalendarClock, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getUserBookings } from '@/services/bookingService';
+import EmptyState from '@/components/common/EmptyState';
 
-// Extended interfaces for modals to include the missing props
 interface ExtendedBookingDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -31,7 +30,6 @@ interface ExtendedCancelBookingModalProps {
   onBookingCancelled?: () => void;
 }
 
-// Declare these components as accepting the extended props
 const ExtendedBookingDetailsModal: React.FC<ExtendedBookingDetailsModalProps> = BookingDetailsModal as any;
 const ExtendedCancelBookingModal: React.FC<ExtendedCancelBookingModalProps> = CancelBookingModal as any;
 
@@ -45,53 +43,43 @@ const MyBookings: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Function to handle viewing booking details
   const handleViewDetails = (booking: BookingWithDetails) => {
     setSelectedBooking(booking);
     setIsDetailsOpen(true);
   };
 
-  // Function to handle closing booking details modal
-  const handleCloseDetails = () => {
-    setIsDetailsOpen(false);
-    setSelectedBooking(null);
-  };
-
-  // Function to handle editing a booking
   const handleEditBooking = (booking: BookingWithDetails) => {
     navigate(`/bookings/edit/${booking.id}`);
   };
 
-  // Function to handle opening the cancel booking modal
   const handleOpenCancelModal = (booking: BookingWithDetails) => {
     setBookingToCancel(booking);
     setIsCancelOpen(true);
   };
 
-  // Function to handle closing the cancel booking modal
   const handleCloseCancelModal = () => {
     setIsCancelOpen(false);
     setBookingToCancel(null);
   };
 
-  // Function to handle successful booking cancellation
   const handleBookingCancelled = () => {
     toast({
       title: 'Booking Cancelled',
       description: 'The booking has been successfully cancelled.',
     });
-    refetch(); // Refresh the bookings list
+    refetch();
     handleCloseCancelModal();
   };
 
-  // Use React Query to fetch bookings
   const { data: allBookings, isLoading, error, refetch } = useQuery({
     queryKey: ['my-bookings', user?.id],
-    queryFn: () => getUserBookings(user?.id || ''),
+    queryFn: () => {
+      if (!user?.id) return Promise.resolve([]);
+      return getUserBookings(user.id);
+    },
     enabled: !!user?.id,
   });
 
-  // Filter bookings based on search query
   const filteredBookings = React.useMemo(() => {
     if (!allBookings) return [];
     return allBookings.filter(booking =>
@@ -100,7 +88,6 @@ const MyBookings: React.FC = () => {
     );
   }, [allBookings, searchQuery]);
 
-  // Separate bookings into upcoming and past
   const upcomingBookings = React.useMemo(() => {
     if (!filteredBookings) return [];
     return filteredBookings.filter(booking => new Date(booking.start_time) >= new Date());
@@ -118,7 +105,6 @@ const MyBookings: React.FC = () => {
         <CardDescription>Manage your upcoming and past bookings.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Search and Filter */}
         <div className="flex items-center justify-between">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -136,49 +122,66 @@ const MyBookings: React.FC = () => {
           </Button>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="upcoming" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="upcoming">
-              <CalendarClock className="mr-2 h-4 w-4" />
-              Upcoming
-            </TabsTrigger>
-            <TabsTrigger value="past">
-              <Clock className="mr-2 h-4 w-4" />
-              Past
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="upcoming" className="space-y-4">
-            {isLoading && <p>Loading upcoming bookings...</p>}
-            {error && <p className="text-red-500">Error: {(error as Error).message}</p>}
-            {upcomingBookings && upcomingBookings.length > 0 ? (
-              <BookingsList
-                bookings={upcomingBookings}
-                onViewDetails={handleViewDetails}
-                onEdit={handleEditBooking}
-                onCancel={handleOpenCancelModal}
-              />
-            ) : (
-              <p>No upcoming bookings found.</p>
-            )}
-          </TabsContent>
-          <TabsContent value="past" className="space-y-4">
-            {isLoading && <p>Loading past bookings...</p>}
-            {error && <p className="text-red-500">Error: {(error as Error).message}</p>}
-            {pastBookings && pastBookings.length > 0 ? (
-              <BookingsList
-                bookings={pastBookings}
-                onViewDetails={handleViewDetails}
-                onEdit={handleEditBooking}
-                onCancel={handleOpenCancelModal}
-              />
-            ) : (
-              <p>No past bookings found.</p>
-            )}
-          </TabsContent>
-        </Tabs>
+        {isLoading && (
+          <div className="flex justify-center items-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2">Loading your bookings...</span>
+          </div>
+        )}
 
-        {/* Booking Details Modal */}
+        {error && (
+          <EmptyState
+            title="Error loading bookings"
+            description={`We couldn't load your bookings. ${(error as Error).message}`}
+            actionLabel="Try Again"
+            onAction={() => refetch()}
+            icon={<XCircle className="h-8 w-8 text-destructive" />}
+          />
+        )}
+
+        {!isLoading && !error && (
+          <Tabs defaultValue="upcoming" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="upcoming">
+                <CalendarClock className="mr-2 h-4 w-4" />
+                Upcoming
+              </TabsTrigger>
+              <TabsTrigger value="past">
+                <Clock className="mr-2 h-4 w-4" />
+                Past
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="upcoming" className="space-y-4">
+              {isLoading && <p>Loading upcoming bookings...</p>}
+              {error && <p className="text-red-500">Error: {(error as Error).message}</p>}
+              {upcomingBookings && upcomingBookings.length > 0 ? (
+                <BookingsList
+                  bookings={upcomingBookings}
+                  onViewDetails={handleViewDetails}
+                  onEdit={handleEditBooking}
+                  onCancel={handleOpenCancelModal}
+                />
+              ) : (
+                <p>No upcoming bookings found.</p>
+              )}
+            </TabsContent>
+            <TabsContent value="past" className="space-y-4">
+              {isLoading && <p>Loading past bookings...</p>}
+              {error && <p className="text-red-500">Error: {(error as Error).message}</p>}
+              {pastBookings && pastBookings.length > 0 ? (
+                <BookingsList
+                  bookings={pastBookings}
+                  onViewDetails={handleViewDetails}
+                  onEdit={handleEditBooking}
+                  onCancel={handleOpenCancelModal}
+                />
+              ) : (
+                <p>No past bookings found.</p>
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
+
         <ExtendedBookingDetailsModal
           isOpen={isDetailsOpen}
           onClose={handleCloseDetails}
@@ -187,7 +190,6 @@ const MyBookings: React.FC = () => {
           onCancel={handleOpenCancelModal}
         />
 
-        {/* Cancel Booking Modal */}
         <ExtendedCancelBookingModal
           isOpen={isCancelOpen}
           onClose={handleCloseCancelModal}

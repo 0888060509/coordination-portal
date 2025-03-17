@@ -97,3 +97,10 @@
 - Fixed error in BookingDetailsModal where it was trying to access properties on a null booking object
 - Added null checking to prevent "Cannot read properties of null" runtime errors
 - Improved error handling with a fallback UI when booking details aren't available
+
+## 2023-08-27
+- Fixed database query in getUserBookings function to resolve Supabase relationship error
+- Removed reference to non-existent 'profiles' table in the query
+- Added placeholder user data in booking results to maintain type compatibility
+- Enhanced error handling in MyBookings component with loading and error states
+- Updated BookingsList to handle optional room data safely
