@@ -3,6 +3,11 @@
 
 ## Latest Updates
 
+### [Date: 2025-03-22] - Fixed TypeScript Errors in Room Filtering Components
+- Added `sortBy` property to `RoomFilterOptions` interface in types/index.ts
+- Fixed type error in `getRoomAmenities` function in roomService.ts
+- Ensured proper typing of amenities data in roomService.ts
+
 ### [Date: 2025-03-21] - Implemented Room Search and Filtering Components
 - Created separate RoomSearch.tsx component for date, time, and capacity filtering
 - Implemented RoomFilters.tsx component for amenities and location filtering
