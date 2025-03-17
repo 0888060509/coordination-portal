@@ -187,3 +187,8 @@
 1. Consider adding real-time updates for booking status changes
 2. Add filtering options (e.g., by room, by status)
 3. Implement notifications for upcoming meetings
+
+## 2024-03-18
+- Implemented Admin Dashboard Page with statistics and charts
+- Created AdminBookingsByRoomChart and AdminRoomUtilizationChart components
+- Added adminService.ts for fetching admin statistics
