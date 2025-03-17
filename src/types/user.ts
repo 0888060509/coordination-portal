@@ -7,6 +7,7 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  name: string; // Added name property to match usage in components
   avatarUrl?: string;
   role: 'user' | 'admin';
   department?: string;
@@ -25,7 +26,7 @@ export interface AuthContextType {
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  signOut: () => Promise<void>; // Added signOut method
+  signOut: () => Promise<void>; 
   forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (password: string) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (data: Partial<User>) => Promise<{ success: boolean; error?: string }>;

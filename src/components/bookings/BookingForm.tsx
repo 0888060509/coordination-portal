@@ -11,7 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { RoomWithAmenities } from "@/types/room";
 import { BookingWithDetails, CreateBookingData } from "@/types/booking";
 import bookingService from "@/services/bookingService";
-import notificationService from "@/services/notificationService";
+import * as notificationService from "@/services/notificationService";
 import MeetingDetailsForm from "./MeetingDetailsForm";
 import AttendeesForm from "./AttendeesForm";
 import BookingReview from "./BookingReview";

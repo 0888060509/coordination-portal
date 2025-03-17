@@ -73,12 +73,14 @@ export const transformUser = async (supabaseUser: SupabaseUser | null, session: 
           return null;
         }
         
+        const fullDisplayName = `${newProfile.first_name} ${newProfile.last_name}`.trim() || supabaseUser.email || '';
+        
         return {
           id: supabaseUser.id,
           email: supabaseUser.email || '',
-          name: `${newProfile.first_name} ${newProfile.last_name}`.trim() || supabaseUser.email || '',
           firstName: newProfile.first_name || '',
           lastName: newProfile.last_name || '',
+          name: fullDisplayName,
           avatarUrl: newProfile.avatar_url || avatarUrl,
           role: newProfile.is_admin ? 'admin' : 'user',
           department: newProfile.department || undefined,
@@ -89,12 +91,14 @@ export const transformUser = async (supabaseUser: SupabaseUser | null, session: 
       return null;
     }
     
+    const fullDisplayName = `${profile.first_name} ${profile.last_name}`.trim() || supabaseUser.email || '';
+    
     return {
       id: supabaseUser.id,
       email: supabaseUser.email || '',
-      name: `${profile.first_name} ${profile.last_name}`.trim() || supabaseUser.email || '',
       firstName: profile.first_name || '',
       lastName: profile.last_name || '',
+      name: fullDisplayName,
       avatarUrl: profile.avatar_url || supabaseUser.user_metadata?.avatar_url,
       role: profile.is_admin ? 'admin' : 'user',
       department: profile.department || undefined,

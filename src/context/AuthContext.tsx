@@ -60,6 +60,70 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     session
   );
 
+  // Wrap methods to ensure they return the correct types
+  const wrappedLogin = async (email: string, password: string) => {
+    try {
+      const result = await login(email, password);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Login failed" };
+    }
+  };
+
+  const wrappedLoginWithGoogle = async () => {
+    try {
+      await loginWithGoogle();
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Google login failed" };
+    }
+  };
+
+  const wrappedRegister = async (email: string, password: string, firstName: string, lastName: string) => {
+    try {
+      await register(email, password, firstName, lastName);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Registration failed" };
+    }
+  };
+
+  const wrappedForgotPassword = async (email: string) => {
+    try {
+      await forgotPassword(email);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Failed to send reset email" };
+    }
+  };
+
+  const wrappedResetPassword = async (password: string) => {
+    try {
+      await resetPassword(password);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Failed to reset password" };
+    }
+  };
+
+  const wrappedUpdateProfile = async (data: Partial<User>) => {
+    try {
+      await updateProfile(data);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Failed to update profile" };
+    }
+  };
+
+  const wrappedRefreshProfile = async () => {
+    try {
+      await refreshProfile();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
   // Listen for login-success custom event
   useEffect(() => {
     const handleLoginSuccess = () => {
@@ -138,14 +202,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoading,
     isAdmin,
     authInitialized,
-    login,
-    loginWithGoogle,
-    register,
+    login: wrappedLogin,
+    loginWithGoogle: wrappedLoginWithGoogle,
+    register: wrappedRegister,
     logout,
-    forgotPassword,
-    resetPassword,
-    updateProfile,
-    refreshProfile,
+    signOut: logout, // Alias for logout
+    forgotPassword: wrappedForgotPassword,
+    resetPassword: wrappedResetPassword,
+    updateProfile: wrappedUpdateProfile,
+    refreshProfile: wrappedRefreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

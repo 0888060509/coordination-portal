@@ -8,14 +8,12 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import NavItem from "./NavItem";
-import MobileNavItem from "./MobileNavItem";
-import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
   DropdownMenuSeparator, DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/context/AuthContext";
 import Notifications from "../notifications/Notifications";
 import { fetchUserProfile } from "@/services/profileService";
 
@@ -48,22 +46,38 @@ const DashboardLayout = () => {
 
             {/* Desktop navigation */}
             <nav className="hidden md:flex items-center gap-6">
-              <NavItem to="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />}>
-                Dashboard
-              </NavItem>
+              <NavLink 
+                to="/dashboard" 
+                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                <span>Dashboard</span>
+              </NavLink>
               
-              <NavItem to="/rooms" icon={<BookOpen className="h-4 w-4" />}>
-                Rooms
-              </NavItem>
+              <NavLink 
+                to="/rooms" 
+                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>Rooms</span>
+              </NavLink>
               
-              <NavItem to="/bookings" icon={<Calendar className="h-4 w-4" />}>
-                Bookings
-              </NavItem>
+              <NavLink 
+                to="/bookings" 
+                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
+              >
+                <Calendar className="h-4 w-4" />
+                <span>Bookings</span>
+              </NavLink>
 
               {isAuthenticated && isAdmin && (
-                <NavItem to="/admin" icon={<Users className="h-4 w-4" />}>
-                  Admin
-                </NavItem>
+                <NavLink 
+                  to="/admin" 
+                  className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Admin</span>
+                </NavLink>
               )}
             </nav>
           </div>
@@ -131,47 +145,52 @@ const DashboardLayout = () => {
             </Link>
             
             <nav className="flex flex-col gap-2">
-              <MobileNavItem 
+              <NavLink 
                 to="/dashboard" 
-                icon={<LayoutDashboard className="h-5 w-5" />} 
+                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
                 onClick={() => setOpen(false)}
               >
-                Dashboard
-              </MobileNavItem>
+                <LayoutDashboard className="h-5 w-5" />
+                <span>Dashboard</span>
+              </NavLink>
               
-              <MobileNavItem 
+              <NavLink 
                 to="/rooms" 
-                icon={<BookOpen className="h-5 w-5" />} 
+                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
                 onClick={() => setOpen(false)}
               >
-                Rooms
-              </MobileNavItem>
+                <BookOpen className="h-5 w-5" />
+                <span>Rooms</span>
+              </NavLink>
               
-              <MobileNavItem 
+              <NavLink 
                 to="/bookings" 
-                icon={<Calendar className="h-5 w-5" />} 
+                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
                 onClick={() => setOpen(false)}
               >
-                Bookings
-              </MobileNavItem>
+                <Calendar className="h-5 w-5" />
+                <span>Bookings</span>
+              </NavLink>
 
               {isAuthenticated && isAdmin && (
-                <MobileNavItem 
+                <NavLink 
                   to="/admin" 
-                  icon={<Users className="h-5 w-5" />} 
+                  className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
                   onClick={() => setOpen(false)}
                 >
-                  Admin
-                </MobileNavItem>
+                  <Users className="h-5 w-5" />
+                  <span>Admin</span>
+                </NavLink>
               )}
               
-              <MobileNavItem 
+              <NavLink 
                 to="/settings" 
-                icon={<Settings className="h-5 w-5" />} 
+                className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-md ${isActive ? 'bg-muted' : 'hover:bg-muted/50'}`}
                 onClick={() => setOpen(false)}
               >
-                Settings
-              </MobileNavItem>
+                <Settings className="h-5 w-5" />
+                <span>Settings</span>
+              </NavLink>
             </nav>
 
             <div className="mt-auto pb-4">

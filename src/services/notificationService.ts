@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Notification, NotificationType, BookingWithDetails } from "@/types/booking";
@@ -97,8 +96,24 @@ export const createNotification = async (
 };
 
 // Send booking confirmation notification
-export const sendBookingConfirmation = async (booking: BookingWithDetails) => {
+export const sendBookingConfirmation = async (bookingId: string) => {
   try {
+    // Fetch the booking details first
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        room:rooms(*),
+        user:profiles(*)
+      `)
+      .eq('id', bookingId)
+      .single();
+      
+    if (bookingError || !booking) {
+      console.error("Error fetching booking for confirmation:", bookingError);
+      return false;
+    }
+    
     // Create in-app notification
     await createNotification(
       booking.user_id,
@@ -133,8 +148,24 @@ export const sendBookingConfirmation = async (booking: BookingWithDetails) => {
 };
 
 // Send booking reminder notification
-export const sendBookingReminder = async (booking: BookingWithDetails) => {
+export const sendBookingReminder = async (bookingId: string) => {
   try {
+    // Fetch the booking details first
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        room:rooms(*),
+        user:profiles(*)
+      `)
+      .eq('id', bookingId)
+      .single();
+      
+    if (bookingError || !booking) {
+      console.error("Error fetching booking for reminder:", bookingError);
+      return false;
+    }
+    
     // Create in-app notification
     await createNotification(
       booking.user_id,
@@ -169,8 +200,24 @@ export const sendBookingReminder = async (booking: BookingWithDetails) => {
 };
 
 // Send booking update notification
-export const sendBookingUpdate = async (booking: BookingWithDetails) => {
+export const sendBookingUpdate = async (bookingId: string) => {
   try {
+    // Fetch the booking details first
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        room:rooms(*),
+        user:profiles(*)
+      `)
+      .eq('id', bookingId)
+      .single();
+      
+    if (bookingError || !booking) {
+      console.error("Error fetching booking for update:", bookingError);
+      return false;
+    }
+    
     // Create in-app notification
     await createNotification(
       booking.user_id,
@@ -205,8 +252,24 @@ export const sendBookingUpdate = async (booking: BookingWithDetails) => {
 };
 
 // Send booking cancellation notification
-export const sendBookingCancellation = async (booking: BookingWithDetails) => {
+export const sendBookingCancellation = async (bookingId: string) => {
   try {
+    // Fetch the booking details first
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        room:rooms(*),
+        user:profiles(*)
+      `)
+      .eq('id', bookingId)
+      .single();
+      
+    if (bookingError || !booking) {
+      console.error("Error fetching booking for cancellation:", bookingError);
+      return false;
+    }
+    
     // Create in-app notification
     await createNotification(
       booking.user_id,
@@ -260,4 +323,17 @@ export const subscribeToNotifications = (
       }
     )
     .subscribe();
+};
+
+// Export default for module
+export default {
+  fetchNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  createNotification,
+  sendBookingConfirmation,
+  sendBookingReminder,
+  sendBookingUpdate,
+  sendBookingCancellation,
+  subscribeToNotifications
 };
