@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { Session } from "@supabase/supabase-js";
 import { User, AuthContextType } from "@/types/user";
@@ -99,6 +98,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const wrappedResetPassword = async (password: string) => {
     try {
+      // Here was the error - we were passing a token that's not expected by the type signature
+      // Pass only the password to match the AuthContextType interface
       await resetPassword(password);
       return { success: true };
     } catch (error: any) {

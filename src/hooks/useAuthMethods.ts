@@ -266,7 +266,7 @@ export const useAuthMethods = (
     }
   };
 
-  const resetPassword = async (token: string, password: string) => {
+  const resetPassword = async (password: string) => {
     try {
       setIsLoading(true);
       // In Supabase, this is typically handled by the updateUser method after the user has clicked the reset link
