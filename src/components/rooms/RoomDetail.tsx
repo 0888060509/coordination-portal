@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -174,10 +173,12 @@ const RoomDetail = () => {
 
       {/* Booking Modal */}
       <BookingModal
-        open={isBookingModalOpen}
-        onOpenChange={setIsBookingModalOpen}
-        roomId={room.id}
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        room={room}
         initialDate={selectedDate}
+        initialStartTime="09:00"
+        initialEndTime="10:00"
       />
     </div>
   );

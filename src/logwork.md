@@ -3,6 +3,11 @@
 
 ## Latest Updates
 
+### [Date: 2025-03-29] - Fixed Props Mismatch in RoomDetail Component
+- Fixed property name mismatch between RoomDetail and BookingModal components
+- Updated BookingModal props from `open/onOpenChange` to `isOpen/onClose` format
+- Added initial time values for booking time slots
+
 ### [Date: 2025-03-28] - Fixed Type Errors in Room Components
 - Fixed type conversion errors in RoomAvailabilityCalendar.tsx by properly creating Date objects
 - Changed setHours(new Date(...)) to create proper Date objects instead of using numeric timestamps
