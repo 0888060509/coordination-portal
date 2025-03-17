@@ -52,12 +52,22 @@ export interface CreateBookingData {
   user_id: string;
   title: string;
   description?: string;
-  start_time: Date;
-  end_time: Date;
+  start_time: Date | string;
+  end_time: Date | string;
   attendees?: string[];
   meeting_type?: string;
   equipment_needed?: string[];
   special_requests?: string;
+  recurring_pattern_id?: string;
+  is_recurring?: boolean;
+  recurring_pattern?: {
+    frequency: FrequencyType;
+    interval: number;
+    days_of_week?: number[];
+    start_date?: string;
+    end_date?: string;
+    max_occurrences?: number;
+  };
 }
 
 // Data for creating a recurring pattern

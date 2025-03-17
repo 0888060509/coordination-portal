@@ -49,3 +49,10 @@
 - Created dateUtils.ts utility for date formatting functions
 - Extended types with EQUIPMENT_OPTIONS and DAYS_OF_WEEK constants
 - Adapted Chakra UI components to use shadcn/ui components
+
+## 2023-08-19
+- Fixed TypeScript errors in RecurringOptions component
+- Extended CreateBookingData type to include recurring_pattern and is_recurring properties
+- Added getTimeSlots function to dateUtils.ts for time selection in booking form
+- Ensured consistency between types in booking.ts and index.ts
+

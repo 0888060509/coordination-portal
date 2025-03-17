@@ -50,6 +50,15 @@ export interface CreateBookingData {
   equipment_needed?: string[];
   special_requests?: string;
   recurring_pattern_id?: string;
+  is_recurring?: boolean;
+  recurring_pattern?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+    days_of_week?: number[];
+    start_date?: string;
+    end_date?: string;
+    max_occurrences?: number;
+  };
 }
 
 export interface RecurringPattern {
