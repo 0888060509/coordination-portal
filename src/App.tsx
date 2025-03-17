@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { EditBooking } from '@/components/bookings';
 import NotFound from './pages/NotFoundPage';
 import IndexPage from './pages/IndexPage';
+import AppLayout from './components/layout/AppLayout';
 
 const App = () => {
   const { theme } = useTheme();
@@ -33,35 +34,36 @@ const App = () => {
   };
 
   return (
-    <AppProviders>
-      <Routes>
-        <Route path="/" element={<IndexPage />} />
-        
-        {/* Auth Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        
-        {/* Protected Routes */}
-        <Route element={<ProtectedRoute />}>
-          {/* Bookings */}
+    <Routes>
+      <Route path="/" element={<IndexPage />} />
+      
+      {/* Auth Routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      
+      {/* Protected Routes */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<BookingsPage />} />
           <Route path="/bookings" element={<BookingsPage />} />
           <Route path="/bookings/edit/:bookingId" element={<EditBooking />} />
           <Route path="/rooms" element={<BookingsPage />} />
           <Route path="/profile" element={<BookingsPage />} />
           <Route path="/settings" element={<BookingsPage />} />
+          <Route path="/help" element={<BookingsPage />} />
+          <Route path="/notifications" element={<BookingsPage />} />
           
           {/* Admin Routes */}
           <Route path="/admin" element={<BookingsPage />} />
           <Route path="/admin/rooms" element={<BookingsPage />} />
           <Route path="/admin/users" element={<BookingsPage />} />
         </Route>
-        
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppProviders>
+      </Route>
+      
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 };
 

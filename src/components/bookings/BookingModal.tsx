@@ -1,6 +1,5 @@
 
-import * as React from "react";
-import { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -20,14 +19,14 @@ interface BookingModalProps {
   initialEndTime: string;
 }
 
-const BookingModal: React.FC<BookingModalProps> = ({
+const BookingModal = ({
   isOpen,
   onClose,
   room,
   initialDate,
   initialStartTime,
   initialEndTime
-}) => {
+}: BookingModalProps) => {
   const navigate = useNavigate();
   
   const handleBookingSuccess = () => {
