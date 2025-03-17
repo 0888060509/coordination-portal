@@ -35,6 +35,7 @@ export interface BookingWithDetails {
   equipment_needed?: string[];
   special_requests?: string;
   meeting_type?: string;
+  cancellation_reason?: string;
 }
 
 export interface CreateBookingData {
@@ -42,8 +43,8 @@ export interface CreateBookingData {
   user_id: string;
   title: string;
   description?: string;
-  start_time: Date;
-  end_time: Date;
+  start_time: Date | string;
+  end_time: Date | string;
   attendees?: string[];
   meeting_type?: string;
   equipment_needed?: string[];
@@ -61,6 +62,21 @@ export interface RecurringPattern {
   end_date?: string;
   max_occurrences?: number;
   created_at: string;
+}
+
+export interface RecurringPatternRequest {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  interval: number;
+  daysOfWeek?: number[];
+  endDate?: Date;
+  maxOccurrences?: number;
+  excludeDates?: Date[];
+}
+
+export interface RecurringBookingInstance {
+  id: string;
+  date: Date;
+  status: 'confirmed' | 'cancelled' | 'completed' | 'conflict' | 'excluded';
 }
 
 export type NotificationType = 'confirmation' | 'reminder' | 'update' | 'cancellation';

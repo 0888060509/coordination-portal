@@ -1,15 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { BookingWithDetails } from '@/types/booking';
+import { BookingWithDetails, RecurringPattern } from '@/types/booking';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Calendar, Users, MapPin, FileText, CheckCircle, XCircle, Package } from 'lucide-react';
+import { Clock, Calendar, Users, MapPin, FileText, CheckCircle, XCircle, Package, Repeat } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { getAvailableUsers } from '@/services/bookingService';
+import { getAvailableUsers, getRecurringPattern } from '@/services/bookingService';
 
 interface BookingDetailsProps {
   booking: BookingWithDetails;
@@ -27,6 +27,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({
   showActions = true,
 }) => {
   const [attendeeDetails, setAttendeeDetails] = useState<any[]>([]);
+  const [recurringPattern, setRecurringPattern] = useState<RecurringPattern | null>(null);
   
   // Fetch all users to get attendee details
   const { data: users } = useQuery({
@@ -34,6 +35,18 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({
     queryFn: () => getAvailableUsers(),
     enabled: Boolean(booking?.attendees?.length),
   });
+  
+  // Fetch recurring pattern if this is a recurring booking
+  useEffect(() => {
+    const fetchRecurringPattern = async () => {
+      if (booking.recurring_pattern_id) {
+        const pattern = await getRecurringPattern(booking.recurring_pattern_id);
+        setRecurringPattern(pattern);
+      }
+    };
+    
+    fetchRecurringPattern();
+  }, [booking.recurring_pattern_id]);
   
   // When users are loaded, match attendee IDs to get names and details
   useEffect(() => {
@@ -59,6 +72,35 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({
     ? format(new Date(booking.end_time), 'p')
     : 'N/A';
   
+  // Format recurring pattern description
+  const getRecurringDescription = (): string => {
+    if (!recurringPattern) return '';
+    
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    
+    let description = `Repeats ${recurringPattern.frequency}`;
+    
+    if (recurringPattern.interval > 1) {
+      description += ` every ${recurringPattern.interval} ${
+        recurringPattern.frequency === "daily" ? "days" : 
+        recurringPattern.frequency === "weekly" ? "weeks" : "months"
+      }`;
+    }
+    
+    if (recurringPattern.frequency === "weekly" && recurringPattern.days_of_week?.length) {
+      const days = recurringPattern.days_of_week.map(d => dayNames[d === 7 ? 0 : d - 1]);
+      description += ` on ${days.join(", ")}`;
+    }
+    
+    if (recurringPattern.end_date) {
+      description += ` until ${format(new Date(recurringPattern.end_date), "MMMM d, yyyy")}`;
+    } else if (recurringPattern.max_occurrences) {
+      description += ` for ${recurringPattern.max_occurrences} occurrences`;
+    }
+    
+    return description;
+  };
+  
   // Determine the booking status badge
   const getStatusBadge = () => {
     switch (booking.status) {
@@ -83,7 +125,16 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({
               Booked by {booking.user.first_name} {booking.user.last_name}
             </div>
           </div>
-          {getStatusBadge()}
+          <div className="flex flex-col gap-2 items-end">
+            {getStatusBadge()}
+            
+            {booking.recurring_pattern_id && (
+              <Badge variant="outline" className="flex items-center">
+                <Repeat className="w-3 h-3 mr-1" />
+                Recurring
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       
@@ -98,6 +149,13 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({
             <Clock className="w-4 h-4 mr-2 text-muted-foreground" />
             <span className="text-sm">{formattedStartTime} - {formattedEndTime}</span>
           </div>
+          
+          {recurringPattern && (
+            <div className="flex items-center mt-1 text-sm">
+              <Repeat className="w-4 h-4 mr-2 text-muted-foreground" />
+              <span>{getRecurringDescription()}</span>
+            </div>
+          )}
         </div>
         
         <Separator />
@@ -184,6 +242,14 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({
           <div className="space-y-1.5">
             <h3 className="text-sm font-medium">Special Requests</h3>
             <p className="text-sm text-muted-foreground">{booking.special_requests}</p>
+          </div>
+        )}
+        
+        {/* Cancellation Reason */}
+        {booking.status === 'cancelled' && booking.cancellation_reason && (
+          <div className="space-y-1.5">
+            <h3 className="text-sm font-medium">Cancellation Reason</h3>
+            <p className="text-sm text-muted-foreground">{booking.cancellation_reason}</p>
           </div>
         )}
       </CardContent>

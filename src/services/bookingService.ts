@@ -138,6 +138,183 @@ export const createBooking = async (bookingData: CreateBookingData): Promise<str
   }
 };
 
+// Create a recurring booking
+export const createRecurringBooking = async (
+  bookingData: CreateBookingData, 
+  recurringPattern: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+    daysOfWeek?: number[];
+    endDate?: Date;
+    maxOccurrences?: number;
+    excludeDates?: Date[];
+  }
+): Promise<{ bookingIds: string[], conflicts: Date[] }> => {
+  try {
+    // Format the data for the function call
+    const excludeDates = recurringPattern.excludeDates 
+      ? recurringPattern.excludeDates.map(d => d.toISOString()) 
+      : null;
+    
+    const { data, error } = await supabase.rpc('create_recurring_bookings', {
+      p_room_id: bookingData.room_id,
+      p_user_id: bookingData.user_id,
+      p_title: bookingData.title,
+      p_description: bookingData.description || null,
+      p_start_time: bookingData.start_time instanceof Date 
+        ? bookingData.start_time.toISOString() 
+        : bookingData.start_time,
+      p_end_time: bookingData.end_time instanceof Date 
+        ? bookingData.end_time.toISOString() 
+        : bookingData.end_time,
+      p_frequency: recurringPattern.frequency,
+      p_interval: recurringPattern.interval,
+      p_days_of_week: recurringPattern.daysOfWeek || null,
+      p_max_occurrences: recurringPattern.maxOccurrences || null,
+      p_pattern_end_date: recurringPattern.endDate ? recurringPattern.endDate.toISOString() : null,
+      p_exclude_dates: excludeDates
+    });
+
+    if (error) {
+      console.error('Error creating recurring bookings:', error);
+      throw new Error(error.message);
+    }
+
+    // Process the results
+    const bookingIds: string[] = [];
+    const conflicts: Date[] = [];
+
+    if (data && data.length > 0) {
+      data.forEach((result: any) => {
+        if (result.status === 'confirmed' && result.booking_id) {
+          bookingIds.push(result.booking_id);
+        } else if (result.status === 'conflict') {
+          conflicts.push(new Date(result.occurrence_date));
+        }
+      });
+    }
+
+    return { bookingIds, conflicts };
+  } catch (error: any) {
+    console.error('Error in createRecurringBooking:', error);
+    throw error;
+  }
+};
+
+// Check recurring booking availability
+export const checkRecurringAvailability = async (
+  roomId: string,
+  startTime: Date,
+  endTime: Date,
+  recurringPattern: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+    daysOfWeek?: number[];
+    endDate?: Date;
+    maxOccurrences?: number;
+  }
+): Promise<{ date: Date, available: boolean, conflictId?: string }[]> => {
+  try {
+    const { data, error } = await supabase.rpc('check_recurring_availability', {
+      p_room_id: roomId,
+      p_start_date: startTime.toISOString(),
+      p_end_date: endTime.toISOString(),
+      p_frequency: recurringPattern.frequency,
+      p_interval: recurringPattern.interval,
+      p_days_of_week: recurringPattern.daysOfWeek || null,
+      p_max_occurrences: recurringPattern.maxOccurrences || null,
+      p_pattern_end_date: recurringPattern.endDate ? recurringPattern.endDate.toISOString() : null
+    });
+
+    if (error) {
+      console.error('Error checking recurring availability:', error);
+      throw new Error(error.message);
+    }
+
+    return (data || []).map((item: any) => ({
+      date: new Date(item.occurrence_date),
+      available: item.is_available,
+      conflictId: item.conflicting_booking_id
+    }));
+  } catch (error: any) {
+    console.error('Error in checkRecurringAvailability:', error);
+    throw error;
+  }
+};
+
+// Get the pattern for a recurring booking
+export const getRecurringPattern = async (patternId: string): Promise<RecurringPattern | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('recurring_patterns')
+      .select('*')
+      .eq('id', patternId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching recurring pattern:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in getRecurringPattern:', error);
+    return null;
+  }
+};
+
+// Get all instances of a recurring booking
+export const getRecurringBookingInstances = async (patternId: string): Promise<BookingWithDetails[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        room:rooms(*),
+        user:profiles(*)
+      `)
+      .eq('recurring_pattern_id', patternId)
+      .order('start_time', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching recurring booking instances:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error in getRecurringBookingInstances:', error);
+    return [];
+  }
+};
+
+// Cancel a recurring booking
+export const cancelRecurringBooking = async (
+  patternId: string,
+  cancelAll: boolean = true,
+  bookingId?: string,
+  reason?: string
+): Promise<number> => {
+  try {
+    const { data, error } = await supabase.rpc('cancel_recurring_bookings', {
+      p_pattern_id: patternId,
+      p_cancel_all: cancelAll,
+      p_booking_id: bookingId || null,
+      p_cancellation_reason: reason || null
+    });
+
+    if (error) {
+      console.error('Error cancelling recurring booking:', error);
+      throw new Error(error.message);
+    }
+
+    return data || 0;
+  } catch (error: any) {
+    console.error('Error in cancelRecurringBooking:', error);
+    throw error;
+  }
+};
+
 // Get all bookings for a user with filtering options
 export const getUserBookings = async (
   userId: string,
@@ -334,6 +511,86 @@ export const updateBooking = async (
   }
 };
 
+// Update a recurring booking
+export const updateRecurringBooking = async (
+  patternId: string,
+  bookingData: Partial<Booking | CreateBookingData>,
+  recurringPattern?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+    daysOfWeek?: number[];
+    endDate?: Date;
+    maxOccurrences?: number;
+  },
+  updateAll: boolean = true,
+  bookingId?: string
+): Promise<boolean> => {
+  try {
+    // If updating just a single instance
+    if (!updateAll && bookingId) {
+      // Remove the recurring pattern link for this booking
+      const { error: detachError } = await supabase
+        .from('bookings')
+        .update({ recurring_pattern_id: null })
+        .eq('id', bookingId);
+
+      if (detachError) {
+        console.error('Error detaching booking from recurring pattern:', detachError);
+        throw new Error(detachError.message);
+      }
+
+      // Update the individual booking
+      return await updateBooking(bookingId, bookingData);
+    }
+
+    // If updating the entire series
+    if (recurringPattern) {
+      // First update the recurring pattern
+      const { error: patternError } = await supabase
+        .from('recurring_patterns')
+        .update({
+          frequency: recurringPattern.frequency,
+          interval: recurringPattern.interval,
+          days_of_week: recurringPattern.daysOfWeek || null,
+          end_date: recurringPattern.endDate ? recurringPattern.endDate.toISOString() : null,
+          max_occurrences: recurringPattern.maxOccurrences || null
+        })
+        .eq('id', patternId);
+
+      if (patternError) {
+        console.error('Error updating recurring pattern:', patternError);
+        throw new Error(patternError.message);
+      }
+    }
+
+    // Then update all the bookings in the series
+    if (bookingData) {
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          title: bookingData.title,
+          description: bookingData.description,
+          // Don't update start_time and end_time as they need to be calculated based on the pattern
+          // Don't update room_id as it would require rechecking availability
+          meeting_type: bookingData.meeting_type,
+          special_requests: bookingData.special_requests
+        })
+        .eq('recurring_pattern_id', patternId)
+        .eq('status', 'confirmed');
+
+      if (error) {
+        console.error('Error updating recurring bookings:', error);
+        throw new Error(error.message);
+      }
+    }
+
+    return true;
+  } catch (error: any) {
+    console.error('Error in updateRecurringBooking:', error);
+    throw error;
+  }
+};
+
 // Cancel a booking
 export const cancelBooking = async (
   bookingId: string,
@@ -510,8 +767,14 @@ export const getAllBookings = async (
 const bookingService = {
   getBooking,
   createBooking,
+  createRecurringBooking,
+  checkRecurringAvailability,
+  getRecurringPattern,
+  getRecurringBookingInstances,
+  cancelRecurringBooking,
   getUserBookings,
   updateBooking,
+  updateRecurringBooking,
   cancelBooking,
   createRecurringPattern,
   getAvailableUsers,

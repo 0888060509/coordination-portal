@@ -31,3 +31,14 @@
 - Updated DashboardStats component to use the proper properties from the revised interface
 - Improved type safety across dashboard components
 - Fixed default values in DashboardStats to match the expected interface
+
+## June 16, 2024
+- Implemented recurring booking functionality with database functions
+- Added database functions: generate_recurring_dates, check_recurring_availability, create_recurring_bookings, cancel_recurring_bookings
+- Created RecurringBookingPreview component to show future booking instances and conflicts
+- Added RecurringBookingOptions component for configuring recurrence patterns
+- Updated BookingForm to include recurring booking options
+- Extended bookingService with new functions: createRecurringBooking, checkRecurringAvailability, getRecurringPattern
+- Added getRecurringBookingInstances, cancelRecurringBooking, and updateRecurringBooking functions
+- Enhanced CancelBookingModal to support canceling single instances or entire series
+- Added recurrence pattern description generator and instance exclusion functionality

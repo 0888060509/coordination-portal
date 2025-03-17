@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,12 +10,19 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { RoomWithAmenities } from "@/types/room";
 import { BookingWithDetails, CreateBookingData } from "@/types/booking";
-import { createBooking, getBooking } from "@/services/bookingService";
+import { 
+  createBooking, 
+  getBooking,
+  createRecurringBooking,
+  checkRecurringAvailability
+} from "@/services/bookingService";
 import * as notificationService from "@/services/notificationService";
 import MeetingDetailsForm from "./MeetingDetailsForm";
 import AttendeesForm from "./AttendeesForm";
 import BookingReview from "./BookingReview";
 import BookingConfirmation from "./BookingConfirmation";
+import RecurringBookingOptions, { RecurringOptions } from "./RecurringBookingOptions";
+import RecurringBookingPreview, { RecurringInstance } from "./RecurringBookingPreview";
 import { parseTimeString } from "@/utils/formatUtils";
 
 interface BookingFormProps {
@@ -45,6 +53,16 @@ const bookingFormSchema = z.object({
   equipment: z.array(z.string()).optional(),
   specialRequests: z.string().optional(),
   
+  isRecurring: z.boolean().default(false),
+  recurringOptions: z.object({
+    frequency: z.enum(["daily", "weekly", "monthly"]),
+    interval: z.number().min(1),
+    daysOfWeek: z.array(z.number()).optional(),
+    endType: z.enum(["date", "occurrences", "never"]),
+    endDate: z.date().optional(),
+    maxOccurrences: z.number().optional()
+  }).optional(),
+  
   termsAccepted: z.boolean().refine(val => val === true, {
     message: "You must accept the terms and conditions"
   })
@@ -65,6 +83,9 @@ const BookingForm: React.FC<BookingFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
   const [createdBooking, setCreatedBooking] = useState<BookingWithDetails | null>(null);
+  const [recurringInstances, setRecurringInstances] = useState<RecurringInstance[]>([]);
+  const [excludedDates, setExcludedDates] = useState<Date[]>([]);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
@@ -79,11 +100,148 @@ const BookingForm: React.FC<BookingFormProps> = ({
       externalAttendees: [],
       equipment: [],
       specialRequests: "",
+      isRecurring: false,
+      recurringOptions: {
+        frequency: "weekly",
+        interval: 1,
+        daysOfWeek: [initialDate.getDay() === 0 ? 7 : initialDate.getDay()],
+        endType: "occurrences",
+        maxOccurrences: 10
+      },
       termsAccepted: false
     }
   });
   
+  const isRecurring = form.watch("isRecurring");
+  const recurringOptions = form.watch("recurringOptions");
+  const dateValue = form.watch("date");
+  const startTimeValue = form.watch("startTime");
+  const endTimeValue = form.watch("endTime");
+  
   const totalSteps = 4;
+  
+  // Check recurring availability whenever relevant options change
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (!isRecurring || !recurringOptions) return;
+      
+      try {
+        setIsCheckingAvailability(true);
+        
+        const startDateTime = parseTimeString(startTimeValue, dateValue);
+        const endDateTime = parseTimeString(endTimeValue, dateValue);
+        
+        // Prepare the pattern data
+        const patternData = {
+          frequency: recurringOptions.frequency,
+          interval: recurringOptions.interval,
+          daysOfWeek: recurringOptions.frequency === "weekly" ? recurringOptions.daysOfWeek : undefined,
+          endDate: recurringOptions.endType === "date" ? recurringOptions.endDate : undefined,
+          maxOccurrences: recurringOptions.endType === "occurrences" ? recurringOptions.maxOccurrences : undefined
+        };
+        
+        // Check availability
+        const availability = await checkRecurringAvailability(
+          room.id,
+          startDateTime,
+          endDateTime,
+          patternData
+        );
+        
+        // Map to RecurringInstance format
+        const instances: RecurringInstance[] = availability.map(item => ({
+          date: item.date,
+          available: item.available,
+          conflictId: item.conflictId,
+          excluded: excludedDates.some(d => d.getTime() === item.date.getTime())
+        }));
+        
+        setRecurringInstances(instances);
+      } catch (error) {
+        console.error("Error checking recurring availability:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to check availability for recurring bookings",
+        });
+      } finally {
+        setIsCheckingAvailability(false);
+      }
+    };
+    
+    if (isRecurring) {
+      checkAvailability();
+    }
+  }, [
+    isRecurring, 
+    recurringOptions?.frequency, 
+    recurringOptions?.interval, 
+    recurringOptions?.daysOfWeek, 
+    recurringOptions?.endType, 
+    recurringOptions?.endDate, 
+    recurringOptions?.maxOccurrences,
+    dateValue,
+    startTimeValue,
+    endTimeValue,
+    room.id
+  ]);
+  
+  // Handle recurring options change
+  const handleRecurringOptionsChange = (options: RecurringOptions) => {
+    form.setValue("isRecurring", options.isRecurring);
+    form.setValue("recurringOptions", options);
+  };
+  
+  // Handle exclude/include instance
+  const handleExcludeInstance = (date: Date) => {
+    setExcludedDates(prev => [...prev, date]);
+    setRecurringInstances(prev => 
+      prev.map(instance => 
+        instance.date.getTime() === date.getTime() 
+          ? { ...instance, excluded: true } 
+          : instance
+      )
+    );
+  };
+  
+  const handleIncludeInstance = (date: Date) => {
+    setExcludedDates(prev => prev.filter(d => d.getTime() !== date.getTime()));
+    setRecurringInstances(prev => 
+      prev.map(instance => 
+        instance.date.getTime() === date.getTime() 
+          ? { ...instance, excluded: false } 
+          : instance
+      )
+    );
+  };
+  
+  // Generate recurrence description
+  const getRecurrenceDescription = (): string => {
+    if (!isRecurring || !recurringOptions) return '';
+    
+    let base = `Repeats ${recurringOptions.frequency}`;
+    
+    if (recurringOptions.interval > 1) {
+      base += ` every ${recurringOptions.interval} ${
+        recurringOptions.frequency === "daily" ? "days" : 
+        recurringOptions.frequency === "weekly" ? "weeks" : "months"
+      }`;
+    }
+    
+    if (recurringOptions.frequency === "weekly" && recurringOptions.daysOfWeek?.length) {
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const days = recurringOptions.daysOfWeek.map(d => dayNames[d === 7 ? 0 : d - 1]);
+      base += ` on ${days.join(", ")}`;
+    }
+    
+    if (recurringOptions.endType === "date" && recurringOptions.endDate) {
+      base += ` until ${format(recurringOptions.endDate, "MMMM d, yyyy")}`;
+    } else if (recurringOptions.endType === "occurrences" && recurringOptions.maxOccurrences) {
+      base += ` for ${recurringOptions.maxOccurrences} occurrences`;
+    }
+    
+    return base;
+  };
   
   const nextStep = () => {
     const fieldsToValidate = currentStep === 1 
@@ -134,7 +292,39 @@ const BookingForm: React.FC<BookingFormProps> = ({
         special_requests: data.specialRequests
       };
       
-      const bookingId = await createBooking(bookingData);
+      let bookingId: string;
+      
+      if (data.isRecurring && data.recurringOptions) {
+        // Create a recurring booking
+        const recurringPattern = {
+          frequency: data.recurringOptions.frequency,
+          interval: data.recurringOptions.interval,
+          daysOfWeek: data.recurringOptions.frequency === "weekly" ? data.recurringOptions.daysOfWeek : undefined,
+          endDate: data.recurringOptions.endType === "date" ? data.recurringOptions.endDate : undefined,
+          maxOccurrences: data.recurringOptions.endType === "occurrences" ? data.recurringOptions.maxOccurrences : undefined,
+          excludeDates: excludedDates
+        };
+        
+        const result = await createRecurringBooking(bookingData, recurringPattern);
+        
+        if (result.bookingIds.length === 0) {
+          throw new Error("Failed to create any bookings due to conflicts");
+        }
+        
+        // Use the first booking as the reference
+        bookingId = result.bookingIds[0];
+        
+        if (result.conflicts.length > 0) {
+          toast({
+            title: "Some recurring bookings could not be created",
+            description: `${result.conflicts.length} instance(s) had conflicts and were not booked`,
+            variant: "warning",
+          });
+        }
+      } else {
+        // Create a single booking
+        bookingId = await createBooking(bookingData);
+      }
       
       const bookingDetails = await getBooking(bookingId);
       
@@ -205,6 +395,35 @@ const BookingForm: React.FC<BookingFormProps> = ({
                 )}
               </div>
             </div>
+            
+            <RecurringBookingOptions
+              value={{
+                isRecurring: form.getValues('isRecurring'),
+                frequency: form.getValues('recurringOptions')?.frequency || "weekly",
+                interval: form.getValues('recurringOptions')?.interval || 1,
+                daysOfWeek: form.getValues('recurringOptions')?.daysOfWeek || [],
+                endType: form.getValues('recurringOptions')?.endType || "occurrences",
+                endDate: form.getValues('recurringOptions')?.endDate,
+                maxOccurrences: form.getValues('recurringOptions')?.maxOccurrences
+              }}
+              onChange={handleRecurringOptionsChange}
+              startDate={form.getValues('date')}
+            />
+            
+            {isRecurring && recurringInstances.length > 0 && (
+              <RecurringBookingPreview
+                instances={recurringInstances}
+                onExcludeInstance={handleExcludeInstance}
+                onIncludeInstance={handleIncludeInstance}
+                recurrenceDescription={getRecurrenceDescription()}
+              />
+            )}
+            
+            {isRecurring && isCheckingAvailability && (
+              <div className="text-center py-2 text-muted-foreground">
+                Checking availability...
+              </div>
+            )}
           </div>
         );
       case 2:
