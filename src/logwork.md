@@ -60,3 +60,11 @@
 - Added getWeekDays and isSameDay functions to dateUtils.ts
 - Enhanced date utility functions to support BookingCalendar component
 - Fixed TypeScript errors in the booking components
+
+## 2023-08-21
+- Created core application pages using shadcn/ui components:
+  - DashboardPage with statistics and quick actions
+  - LoginPage and RegisterPage for authentication
+  - NotFoundPage for 404 errors
+- Converted Chakra UI components to use Tailwind CSS and shadcn/ui
+- Implemented responsive layouts for all new pages
