@@ -19,6 +19,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
+  authInitialized: boolean;
   login: (email: string, password: string) => Promise<{ error?: import("@supabase/supabase-js").AuthError; data?: any }>;
   loginWithGoogle: () => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;

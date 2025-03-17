@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { Session } from "@supabase/supabase-js";
 import { User, AuthContextType } from "@/types/user";
 import { useAuthMethods } from "@/hooks/useAuthMethods";
@@ -18,13 +18,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [authInitialized, setAuthInitialized] = useState<boolean>(false);
+  const profileFetchInProgress = useRef<boolean>(false);
 
-  // Set up auth state management
+  // Set up auth state management with the new initialized flag
   useAuthState({
     setUser,
     setSession,
     setIsLoading,
-    setIsAdmin
+    setIsAdmin,
+    setAuthInitialized
   });
 
   // Process OAuth callbacks
@@ -71,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Enhanced direct session check
+  // Enhanced direct session check - run only once and with safeguards
   useEffect(() => {
     let isMounted = true;
     
@@ -80,10 +83,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Direct session check for logged in users on login pages
     const checkSessionAndRedirect = async () => {
-      if (!isMounted) return;
+      if (!isMounted || profileFetchInProgress.current) return;
       
       try {
-        console.log("AuthContext: Direct session check starting");
+        console.log("AuthContext: One-time direct session check starting");
         const { data } = await supabase.auth.getSession();
         
         if (data.session && isMounted) {
@@ -96,14 +99,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (err) {
         console.error("Error in direct session check:", err);
+      } finally {
+        if (isMounted) {
+          // Make sure we release our loading state even if errors occurred
+          setTimeout(() => {
+            if (isMounted && isLoading) {
+              console.log("AuthContext: Forcing loading state to complete");
+              setIsLoading(false);
+              setAuthInitialized(true);
+            }
+          }, 2000);
+        }
       }
     };
     
-    // Run this check only once on mount
-    checkSessionAndRedirect();
+    // Run this check only once on mount, with a small delay to prevent race conditions
+    setTimeout(checkSessionAndRedirect, 300);
+    
+    // Safety timeout to release loading state if something gets stuck
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.log("AuthContext: Safety timeout releasing loading state");
+        setIsLoading(false);
+        setAuthInitialized(true);
+      }
+    }, 5000);
     
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
@@ -113,6 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAuthenticated: !!user,
     isLoading,
     isAdmin,
+    authInitialized,
     login,
     loginWithGoogle,
     register,

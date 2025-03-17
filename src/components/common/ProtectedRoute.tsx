@@ -1,3 +1,4 @@
+
 import { ReactNode, useEffect, useState, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -11,7 +12,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
-  const { isAuthenticated, user, isLoading, isAdmin } = useAuth();
+  const { isAuthenticated, user, isLoading, isAdmin, authInitialized } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [authTimeout, setAuthTimeout] = useState(false);
@@ -20,10 +21,29 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const [hasTriedProcessing, setHasTriedProcessing] = useState(false);
   const [verifyingSession, setVerifyingSession] = useState(false);
   const [authProcessComplete, setAuthProcessComplete] = useState(false);
+  const [forceRenderContent, setForceRenderContent] = useState(false);
   
   const hasNavigatedRef = useRef(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const hasAuthHash = location.hash && location.hash.includes('access_token');
+
+  // Force render content after a reasonable timeout to prevent infinite loading
+  useEffect(() => {
+    // If we're still loading after 5 seconds, force render content
+    loadingTimeoutRef.current = setTimeout(() => {
+      if (isLoading) {
+        console.log("ProtectedRoute: Force rendering content after timeout");
+        setForceRenderContent(true);
+      }
+    }, 5000);
+    
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [isLoading]);
 
   useEffect(() => {
     const authSuccess = localStorage.getItem('auth_success');
@@ -198,6 +218,18 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     }
   }, [isAuthenticated, processingAuth, isLoading, navigate, hasNavigatedRef]);
 
+  // If we're on the dashboard route and stuck loading, force render content
+  useEffect(() => {
+    if (location.pathname === '/dashboard' && isLoading && !forceRenderContent) {
+      const timer = setTimeout(() => {
+        console.log("We're on dashboard but still loading, forcing content render");
+        setForceRenderContent(true);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, isLoading, forceRenderContent]);
+
   const retryAuth = async () => {
     if (hasAuthHash) {
       setAuthTimeout(false);
@@ -296,23 +328,20 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     navigate('/login', { replace: true });
   };
 
+  // Show the children if we're on the dashboard and authenticated, even if still technically loading
+  if (location.pathname === '/dashboard' && (isAuthenticated || forceRenderContent)) {
+    return <>{children}</>;
+  }
+
+  // Don't get stuck in loading state - if authenticated and auth is initialized, show the content
+  if (isAuthenticated && authInitialized) {
+    return <>{children}</>;
+  }
+
+  // Standard loading state
   const showLoading = isLoading || (hasAuthHash && processingAuth) || verifyingSession;
 
-  useEffect(() => {
-    if (isAuthenticated && !isLoading && location.pathname.includes('login') && !hasNavigatedRef.current) {
-      console.log("Authentication is complete but still on login page, navigating to dashboard");
-      hasNavigatedRef.current = true;
-      navigate('/dashboard', { replace: true });
-      
-      setTimeout(() => {
-        if (window.location.pathname.includes('login')) {
-          window.location.href = '/dashboard';
-        }
-      }, 500);
-    }
-  }, [isAuthenticated, isLoading, navigate, location.pathname, hasNavigatedRef]);
-
-  if (showLoading) {
+  if (showLoading && !forceRenderContent) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <LoadingSpinner 
@@ -353,7 +382,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && authInitialized) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -361,6 +390,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Default case - show the children
   return <>{children}</>;
 };
 
