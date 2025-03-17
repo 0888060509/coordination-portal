@@ -1,7 +1,59 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Booking, BookingWithDetails, CreateBookingData, RecurringPattern } from '@/types/booking';
 import { Room } from '@/types/room';
+
+// Get a booking by ID with related details
+export const getBooking = async (bookingId: string): Promise<BookingWithDetails | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        room:rooms(*),
+        user:profiles(*)
+      `)
+      .eq('id', bookingId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching booking:', error);
+      return null;
+    }
+
+    if (!data) return null;
+
+    // Get attendees for this booking
+    const { data: attendees, error: attendeesError } = await supabase
+      .from('booking_attendees')
+      .select('user_id')
+      .eq('booking_id', bookingId);
+
+    if (attendeesError) {
+      console.error('Error fetching attendees:', attendeesError);
+    }
+
+    // Get equipment for this booking
+    const { data: equipment, error: equipmentError } = await supabase
+      .from('booking_equipment')
+      .select('equipment_type')
+      .eq('booking_id', bookingId);
+
+    if (equipmentError) {
+      console.error('Error fetching equipment:', equipmentError);
+    }
+
+    const bookingWithDetails: BookingWithDetails = {
+      ...data,
+      attendees: attendees ? attendees.map(a => a.user_id) : undefined,
+      equipment_needed: equipment ? equipment.map(e => e.equipment_type) : undefined,
+    };
+
+    return bookingWithDetails;
+  } catch (error) {
+    console.error('Error in getBooking:', error);
+    return null;
+  }
+};
 
 // Create a new booking
 export const createBooking = async (bookingData: CreateBookingData): Promise<string> => {
@@ -83,59 +135,6 @@ export const createBooking = async (bookingData: CreateBookingData): Promise<str
   } catch (error: any) {
     console.error('Error in createBooking:', error);
     throw error;
-  }
-};
-
-// Get a booking by ID with related details
-export const getBookingById = async (bookingId: string): Promise<BookingWithDetails | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('bookings')
-      .select(`
-        *,
-        room:rooms(*),
-        user:profiles(*)
-      `)
-      .eq('id', bookingId)
-      .single();
-
-    if (error) {
-      console.error('Error fetching booking:', error);
-      return null;
-    }
-
-    if (!data) return null;
-
-    // Get attendees for this booking
-    const { data: attendees, error: attendeesError } = await supabase
-      .from('booking_attendees')
-      .select('user_id')
-      .eq('booking_id', bookingId);
-
-    if (attendeesError) {
-      console.error('Error fetching attendees:', attendeesError);
-    }
-
-    // Get equipment for this booking
-    const { data: equipment, error: equipmentError } = await supabase
-      .from('booking_equipment')
-      .select('equipment_type')
-      .eq('booking_id', bookingId);
-
-    if (equipmentError) {
-      console.error('Error fetching equipment:', equipmentError);
-    }
-
-    const bookingWithDetails: BookingWithDetails = {
-      ...data,
-      attendees: attendees ? attendees.map(a => a.user_id) : undefined,
-      equipment_needed: equipment ? equipment.map(e => e.equipment_type) : undefined,
-    };
-
-    return bookingWithDetails;
-  } catch (error) {
-    console.error('Error in getBookingById:', error);
-    return null;
   }
 };
 
@@ -509,8 +508,8 @@ export const getAllBookings = async (
 
 // Export as named exports and as a default object
 const bookingService = {
+  getBooking,
   createBooking,
-  getBookingById,
   getUserBookings,
   updateBooking,
   cancelBooking,

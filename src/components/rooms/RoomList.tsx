@@ -1,22 +1,28 @@
+
 import React from 'react';
-import { Room } from '@/types/room';
+import { Room, RoomWithAmenities } from '@/types/room';
 import RoomCard from './RoomCard';
-import { Grid } from '@/components/ui/grid';
-import { getRooms } from '@/services/roomService';
 
 interface RoomListProps {
   rooms: Room[];
 }
 
 const RoomList: React.FC<RoomListProps> = ({ rooms }) => {
+  // Map Room to RoomWithAmenities to ensure all required props are present
+  const processedRooms: RoomWithAmenities[] = rooms.map(room => ({
+    ...room,
+    status: room.is_active ? 'available' : 'inactive',
+    amenities: room.amenities || []
+  })) as RoomWithAmenities[];
+
   return (
     <div>
       {rooms.length > 0 ? (
-        <Grid>
-          {rooms.map((room) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {processedRooms.map((room) => (
             <RoomCard key={room.id} room={room} />
           ))}
-        </Grid>
+        </div>
       ) : (
         <p>No rooms available.</p>
       )}

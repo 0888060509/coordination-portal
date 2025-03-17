@@ -1,16 +1,17 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Building2, Users, Info, CalendarRange } from 'lucide-react';
+import { Building2, Users, Info, CalendarRange, AlertCircle, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from '@/hooks/use-toast';
-import LoadingSpinner, { LoadingContent } from '@/components/ui/loading-spinner';
-import roomService from '@/services/roomService';
+import { useToast } from '@/hooks/use-toast';
+import { Room, RoomWithAmenities } from '@/types/room';
+import { getRoomById } from '@/services/roomService';
 import RoomGallery from './RoomGallery';
 import RoomAmenities from './RoomAmenities';
 import RoomAvailabilityCalendar from './RoomAvailabilityCalendar';
@@ -23,9 +24,16 @@ const RoomDetail = () => {
 
   const { data: room, isLoading, error } = useQuery({
     queryKey: ['room', id],
-    queryFn: () => id ? roomService.getRoomById(id) : null,
+    queryFn: () => id ? getRoomById(id) : null,
     enabled: !!id,
   });
+
+  // Map room to RoomWithAmenities format
+  const processedRoom: RoomWithAmenities | null = room ? {
+    ...room,
+    status: room.is_active ? 'available' : 'inactive',
+    amenities: room.amenities || []
+  } as RoomWithAmenities : null;
 
   const handleBookRoom = () => {
     setIsBookingModalOpen(true);
@@ -36,10 +44,12 @@ const RoomDetail = () => {
   };
 
   if (isLoading) {
-    return <LoadingContent className="min-h-[400px]" />;
+    return <div className="min-h-[400px] flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>;
   }
 
-  if (error || !room) {
+  if (error || !processedRoom) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
@@ -58,32 +68,32 @@ const RoomDetail = () => {
     available: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
     maintenance: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
     inactive: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  }[room.status || 'available'];
+  }[processedRoom.status || 'available'];
 
   return (
     <div className="animate-fade-in space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
-          <h1 className="text-3xl font-bold">{room.name}</h1>
+          <h1 className="text-3xl font-bold">{processedRoom.name}</h1>
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <Badge variant="outline" className={statusColor}>
-              {room.status?.charAt(0).toUpperCase() + room.status?.slice(1)}
+              {processedRoom.status?.charAt(0).toUpperCase() + processedRoom.status?.slice(1)}
             </Badge>
             <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
               <MapPin className="h-4 w-4 mr-1" />
-              {room.location}
-              {room.floor && `, Floor ${room.floor}`}
-              {room.room_number && `, Room ${room.room_number}`}
+              {processedRoom.location}
+              {processedRoom.floor && `, Floor ${processedRoom.floor}`}
+              {processedRoom.room_number && `, Room ${processedRoom.room_number}`}
             </div>
             <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
               <Users className="h-4 w-4 mr-1" />
-              {room.capacity} {room.capacity === 1 ? 'Person' : 'People'}
+              {processedRoom.capacity} {processedRoom.capacity === 1 ? 'Person' : 'People'}
             </div>
           </div>
         </div>
         <Button 
           size="lg" 
-          disabled={room.status !== 'available'}
+          disabled={processedRoom.status !== 'available'}
           onClick={handleBookRoom}
         >
           Book This Room
@@ -91,8 +101,8 @@ const RoomDetail = () => {
       </div>
 
       <RoomGallery 
-        imageUrl={room.image_url} 
-        roomName={room.name} 
+        imageUrl={processedRoom.image_url} 
+        roomName={processedRoom.name} 
       />
 
       <Tabs defaultValue="details" className="w-full">
@@ -107,7 +117,7 @@ const RoomDetail = () => {
             <CardContent className="p-6">
               <h3 className="text-xl font-semibold mb-4">Room Description</h3>
               <p className="text-gray-700 dark:text-gray-300">
-                {room.description || 'No description available for this room.'}
+                {processedRoom.description || 'No description available for this room.'}
               </p>
               
               <Separator className="my-6" />
@@ -118,25 +128,25 @@ const RoomDetail = () => {
                   <div className="flex items-center">
                     <Building2 className="h-5 w-5 mr-2 text-gray-500 dark:text-gray-400" />
                     <span className="font-medium">Building:</span>
-                    <span className="ml-2">{room.location}</span>
+                    <span className="ml-2">{processedRoom.location}</span>
                   </div>
-                  {room.floor && (
+                  {processedRoom.floor && (
                     <div className="flex items-center">
                       <span className="font-medium ml-7">Floor:</span>
-                      <span className="ml-2">{room.floor}</span>
+                      <span className="ml-2">{processedRoom.floor}</span>
                     </div>
                   )}
-                  {room.room_number && (
+                  {processedRoom.room_number && (
                     <div className="flex items-center">
                       <span className="font-medium ml-7">Room Number:</span>
-                      <span className="ml-2">{room.room_number}</span>
+                      <span className="ml-2">{processedRoom.room_number}</span>
                     </div>
                   )}
                 </div>
               </div>
             </CardContent>
             <CardFooter className="bg-gray-50 dark:bg-gray-900/50 py-4 px-6 text-sm text-gray-600 dark:text-gray-400">
-              Last updated: {room.updated_at ? format(new Date(room.updated_at), 'PPP') : 'N/A'}
+              Last updated: {processedRoom.updated_at ? format(new Date(processedRoom.updated_at), 'PPP') : 'N/A'}
             </CardFooter>
           </Card>
         </TabsContent>
@@ -144,7 +154,7 @@ const RoomDetail = () => {
         <TabsContent value="amenities" className="py-4">
           <Card>
             <CardContent className="p-6">
-              <RoomAmenities amenities={room.amenities || []} />
+              <RoomAmenities amenities={processedRoom.amenities || []} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -153,7 +163,7 @@ const RoomDetail = () => {
           <Card>
             <CardContent className="p-6">
               <RoomAvailabilityCalendar 
-                roomId={room.id} 
+                roomId={processedRoom.id} 
                 onDateSelect={handleDateSelect}
               />
             </CardContent>
@@ -164,7 +174,7 @@ const RoomDetail = () => {
       <BookingModal
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}
-        room={room}
+        room={processedRoom}
         initialDate={selectedDate}
         initialStartTime="09:00"
         initialEndTime="10:00"

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { BookingWithDetails } from '@/types/booking';
@@ -13,6 +14,26 @@ import { Search, ListFilter, CalendarClock, CheckCircle, XCircle, Clock } from '
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getUserBookings } from '@/services/bookingService';
+
+// Extended interfaces for modals to include the missing props
+interface ExtendedBookingDetailsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  booking: BookingWithDetails | null;
+  onEdit?: (booking: BookingWithDetails) => void;
+  onCancel?: (booking: BookingWithDetails) => void;
+}
+
+interface ExtendedCancelBookingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  booking: BookingWithDetails | null;
+  onBookingCancelled?: () => void;
+}
+
+// Declare these components as accepting the extended props
+const ExtendedBookingDetailsModal: React.FC<ExtendedBookingDetailsModalProps> = BookingDetailsModal as any;
+const ExtendedCancelBookingModal: React.FC<ExtendedCancelBookingModalProps> = CancelBookingModal as any;
 
 const MyBookings: React.FC = () => {
   const { user } = useAuth();
@@ -116,7 +137,7 @@ const MyBookings: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultvalue="upcoming" className="space-y-4">
+        <Tabs defaultValue="upcoming" className="space-y-4">
           <TabsList>
             <TabsTrigger value="upcoming">
               <CalendarClock className="mr-2 h-4 w-4" />
@@ -129,7 +150,7 @@ const MyBookings: React.FC = () => {
           </TabsList>
           <TabsContent value="upcoming" className="space-y-4">
             {isLoading && <p>Loading upcoming bookings...</p>}
-            {error && <p className="text-red-500">Error: {error.message}</p>}
+            {error && <p className="text-red-500">Error: {(error as Error).message}</p>}
             {upcomingBookings && upcomingBookings.length > 0 ? (
               <BookingsList
                 bookings={upcomingBookings}
@@ -143,7 +164,7 @@ const MyBookings: React.FC = () => {
           </TabsContent>
           <TabsContent value="past" className="space-y-4">
             {isLoading && <p>Loading past bookings...</p>}
-            {error && <p className="text-red-500">Error: {error.message}</p>}
+            {error && <p className="text-red-500">Error: {(error as Error).message}</p>}
             {pastBookings && pastBookings.length > 0 ? (
               <BookingsList
                 bookings={pastBookings}
@@ -158,7 +179,7 @@ const MyBookings: React.FC = () => {
         </Tabs>
 
         {/* Booking Details Modal */}
-        <BookingDetailsModal
+        <ExtendedBookingDetailsModal
           isOpen={isDetailsOpen}
           onClose={handleCloseDetails}
           booking={selectedBooking}
@@ -167,7 +188,7 @@ const MyBookings: React.FC = () => {
         />
 
         {/* Cancel Booking Modal */}
-        <CancelBookingModal
+        <ExtendedCancelBookingModal
           isOpen={isCancelOpen}
           onClose={handleCloseCancelModal}
           booking={bookingToCancel}

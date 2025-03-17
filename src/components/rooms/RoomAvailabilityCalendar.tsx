@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,14 +7,15 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, XCircle, Calendar as CalendarIcon, Clock } from 'lucide-react';
-import { format, addDays, isSameDay, parseISO } from 'date-fns';
+import { CheckCircle, XCircle, Calendar as CalendarIcon, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, addDays, isSameDay, parseISO, startOfWeek, startOfDay, endOfDay, endOfWeek, subWeeks, addWeeks, eachDayOfInterval, addHours } from 'date-fns';
 import { BookingWithDetails } from '@/types/booking';
 import { useQuery } from '@tanstack/react-query';
 import BookingModal from '../bookings/BookingModal';
 import { getRoomAvailability } from '@/services/roomService';
 import { getRoomBookings } from '@/services/bookingService';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface RoomAvailabilityCalendarProps {
   roomId: string;
@@ -87,14 +89,14 @@ const RoomAvailabilityCalendar = ({
 
   // Check if a time slot is available
   const isTimeSlotAvailable = (date: Date) => {
-    if (!availabilityData || !availabilityData.bookings) return true;
+    if (!availabilityData || !availabilityData.conflictingBookings) return true;
     
     // Convert the date to a timestamp for comparison
     const slotStart = date.getTime();
     const slotEnd = addHours(date, 1).getTime();
     
     // Check if there are any overlapping bookings
-    return !availabilityData.bookings.some(booking => {
+    return !availabilityData.conflictingBookings.some(booking => {
       const bookingStart = typeof booking.start_time === 'string' 
         ? parseISO(booking.start_time).getTime()
         : booking.start_time.getTime();
@@ -145,7 +147,8 @@ const RoomAvailabilityCalendar = ({
                 <div className="p-4">
                   {isLoading ? (
                     <div className="flex justify-center p-8">
-                      <LoadingSpinner size="md" showText text="Loading availability..." />
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <span className="ml-2">Loading availability...</span>
                     </div>
                   ) : error ? (
                     <div className="flex flex-col items-center text-center p-8 text-red-500">
@@ -204,7 +207,8 @@ const RoomAvailabilityCalendar = ({
 
                 {isLoading ? (
                   <div className="flex justify-center p-8">
-                    <LoadingSpinner size="md" showText text="Loading availability..." />
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <span className="ml-2">Loading availability...</span>
                   </div>
                 ) : error ? (
                   <div className="flex flex-col items-center text-center p-8 text-red-500">

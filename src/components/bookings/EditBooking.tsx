@@ -15,11 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { getBooking, updateBooking } from "@/services/bookingService";
+import { useAuth } from "@/context/AuthContext";
+import bookingService, { getBooking, updateBooking } from "@/services/bookingService";
 import { getRoom } from "@/services/roomService";
 import { BookingWithDetails } from "@/types/booking";
 import { Room } from "@/types/room";
-import { useAuth } from "@/context/AuthContext";
 
 const EditBooking: React.FC = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
