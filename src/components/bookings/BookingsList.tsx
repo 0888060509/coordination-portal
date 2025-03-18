@@ -10,7 +10,7 @@ import { format } from "date-fns";
 import BookingCard from "./BookingCard";
 
 interface BookingsListProps {
-  onBookRoom?: () => void;
+  onBookRoom: () => void;
 }
 
 const BookingsList = ({ onBookRoom }: BookingsListProps) => {
@@ -90,7 +90,13 @@ const BookingsList = ({ onBookRoom }: BookingsListProps) => {
         <p className="text-gray-500 dark:text-gray-400 mb-4">
           Book a room to manage your meetings and events
         </p>
-        <Button onClick={onBookRoom} className="flex items-center gap-2">
+        <Button 
+          onClick={(e) => {
+            e.stopPropagation();
+            onBookRoom();
+          }} 
+          className="flex items-center gap-2"
+        >
           <PlusCircle className="h-4 w-4" />
           Book a Room
         </Button>
@@ -103,7 +109,13 @@ const BookingsList = ({ onBookRoom }: BookingsListProps) => {
       {!hasBookingsToday && (
         <div className="p-4 text-center border rounded-md bg-blue-50 dark:bg-blue-900/20 mb-4">
           <p className="mb-2">You have no bookings for today.</p>
-          <Button onClick={onBookRoom} className="flex items-center gap-2">
+          <Button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onBookRoom();
+            }} 
+            className="flex items-center gap-2"
+          >
             <PlusCircle className="h-4 w-4" />
             Book a Room
           </Button>

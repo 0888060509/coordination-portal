@@ -25,10 +25,7 @@ const BookingsPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleBookRoom = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleBookRoom = () => {
     if (!isAuthenticated) {
       toast({
         title: "Authentication required",
@@ -48,7 +45,10 @@ const BookingsPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">My Bookings</h1>
         <Button 
-          onClick={handleBookRoom} 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleBookRoom();
+          }} 
           className="flex items-center gap-2"
         >
           <PlusCircle className="h-4 w-4" />
