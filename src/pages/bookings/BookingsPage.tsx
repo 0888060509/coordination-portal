@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import BookingsList from "@/components/bookings/BookingsList";
 import { Button } from "@/components/ui/button";
 import { LoadingContent } from "@/components/ui/loading-spinner";
-import BookingModal from "@/components/bookings/BookingSheetModal";
+import BookingSheetModal from "@/components/bookings/BookingSheetModal";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -25,7 +25,10 @@ const BookingsPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleBookRoom = () => {
+  const handleBookRoom = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (!isAuthenticated) {
       toast({
         title: "Authentication required",
@@ -41,7 +44,7 @@ const BookingsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" onClick={(e) => e.stopPropagation()}>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">My Bookings</h1>
         <Button 
@@ -62,7 +65,7 @@ const BookingsPage = () => {
       )}
 
       {/* Room Booking Modal */}
-      <BookingModal 
+      <BookingSheetModal 
         isOpen={isBookModalOpen} 
         onClose={() => setIsBookModalOpen(false)} 
       />

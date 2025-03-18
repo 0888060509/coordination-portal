@@ -37,7 +37,6 @@ import { roomService } from "@/services/roomService";
 import { bookingService } from "@/services/bookingService";
 import BookingModal from "@/components/bookings/BookingModal";
 import { RoomWithAmenities } from "@/types/room";
-import { Booking } from "@/types/booking";
 import { useAuth } from "@/context/AuthContext";
 
 // Feature icon mapping
@@ -90,7 +89,10 @@ const RoomDetailPage = () => {
     enabled: !!id
   });
 
-  const handleBookRoom = () => {
+  const handleBookRoom = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (!isAuthenticated || !user) {
       toast({
         title: "Authentication required",
@@ -102,6 +104,12 @@ const RoomDetailPage = () => {
     }
     
     setIsBookingModalOpen(true);
+  };
+
+  const handleBookingsTableRowClick = (e: React.MouseEvent, bookingId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/bookings/${bookingId}`);
   };
 
   if (isLoadingRoom) {
@@ -129,7 +137,11 @@ const RoomDetailPage = () => {
     <div className="space-y-6 animate-fade-in">
       <Button
         variant="ghost"
-        onClick={() => navigate("/rooms")}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          navigate("/rooms");
+        }}
         className="mb-4"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -218,7 +230,7 @@ const RoomDetailPage = () => {
                       <TableRow
                         key={booking.id}
                         className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                        onClick={() => navigate(`/bookings/${booking.id}`)}
+                        onClick={(e) => handleBookingsTableRowClick(e, booking.id)}
                       >
                         <TableCell className="font-medium">
                           {booking.title}
@@ -282,7 +294,11 @@ const RoomDetailPage = () => {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => navigate("/bookings")}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate("/bookings");
+                }}
               >
                 <CalendarClock className="mr-2 h-4 w-4" />
                 View All Bookings
@@ -290,7 +306,11 @@ const RoomDetailPage = () => {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => navigate("/rooms")}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate("/rooms");
+                }}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Rooms List
@@ -306,8 +326,8 @@ const RoomDetailPage = () => {
           onClose={() => setIsBookingModalOpen(false)}
           room={room}
           initialDate={new Date()}
-          initialStartTime=""
-          initialEndTime=""
+          initialStartTime={`${new Date().getHours().toString().padStart(2, '0')}:00`}
+          initialEndTime={`${(new Date().getHours() + 1).toString().padStart(2, '0')}:00`}
         />
       )}
     </div>

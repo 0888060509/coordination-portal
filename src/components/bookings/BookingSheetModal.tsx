@@ -53,14 +53,16 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
     }
   };
   
-  const handleCardClick = (room: RoomWithAmenities) => {
+  const handleCardClick = (e: React.MouseEvent, room: RoomWithAmenities) => {
+    e.preventDefault();
+    e.stopPropagation();
     onClose();
     navigate(`/rooms/${room.id}`);
   };
   
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-lg md:max-w-xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-lg md:max-w-xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <SheetHeader>
           <SheetTitle>Book a Room</SheetTitle>
         </SheetHeader>
@@ -74,7 +76,10 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
               <Button 
                 variant="outline" 
                 className="mt-2" 
-                onClick={loadRooms}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  loadRooms();
+                }}
               >
                 Try Again
               </Button>
@@ -86,7 +91,11 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {rooms.map((room) => (
-                <div key={room.id} onClick={() => handleCardClick(room)}>
+                <div 
+                  key={room.id} 
+                  onClick={(e) => handleCardClick(e, room)}
+                  className="cursor-pointer"
+                >
                   <RoomCard
                     room={room}
                     date={new Date()}

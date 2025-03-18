@@ -18,12 +18,14 @@ const BookingCard = ({ booking, onUpdate }: BookingCardProps) => {
   const startTime = new Date(booking.start_time);
   const endTime = new Date(booking.end_time);
   
-  const handleViewDetails = () => {
+  const handleViewDetails = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     navigate(`/bookings/${booking.id}`);
   };
   
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow" onClick={(e) => e.stopPropagation()}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <CardTitle className="text-base line-clamp-1">{booking.title}</CardTitle>

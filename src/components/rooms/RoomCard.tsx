@@ -48,14 +48,15 @@ const RoomCard = ({ room, date, startTime, endTime, showBookingPrompt = false }:
   }, []); // Empty dependency array so it only runs once on mount
   
   const handleViewDetails = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation(); // Prevent event bubbling to parent
     // Navigate to room details page
     navigate(`/rooms/${room.id}`);
   };
   
   const handleBookRoom = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation(); // Prevent event bubbling to parent
-    console.log("Book room clicked", { isAuthenticated, user });
     
     if (!isAuthenticated || !user) {
       toast({
@@ -81,7 +82,10 @@ const RoomCard = ({ room, date, startTime, endTime, showBookingPrompt = false }:
   
   return (
     <>
-      <Card className={`overflow-hidden hover:shadow-lg transition-shadow duration-300 ${showBookingPrompt ? 'ring-2 ring-primary animate-pulse' : ''}`}>
+      <Card 
+        className={`overflow-hidden hover:shadow-lg transition-shadow duration-300 ${showBookingPrompt ? 'ring-2 ring-primary animate-pulse' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="aspect-video w-full overflow-hidden">
           <img
             src={imageUrl}
