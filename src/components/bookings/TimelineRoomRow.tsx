@@ -37,6 +37,11 @@ const TimelineRoomRow = ({ room, timeSlots, bookings }: TimelineRoomRowProps) =>
     setIsDetailsModalOpen(true);
   };
 
+  const handleCancelBooking = () => {
+    // This would handle the booking cancellation
+    setIsDetailsModalOpen(false);
+  };
+
   return (
     <>
       <div 
@@ -83,10 +88,7 @@ const TimelineRoomRow = ({ room, timeSlots, bookings }: TimelineRoomRowProps) =>
           booking={selectedBooking}
           isOpen={isDetailsModalOpen}
           onClose={() => setIsDetailsModalOpen(false)}
-          onUpdate={() => {
-            // This would update the bookings
-            setIsDetailsModalOpen(false);
-          }}
+          onCancelBooking={handleCancelBooking}
         />
       )}
     </>

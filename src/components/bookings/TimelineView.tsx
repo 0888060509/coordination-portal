@@ -37,8 +37,8 @@ const TimelineView = ({ selectedDate }: TimelineViewProps) => {
       setIsLoading(true);
       setError(null);
 
-      // Load rooms
-      const roomsData = await roomService.getAllRooms();
+      // Load rooms - using getRooms() instead of getAllRooms()
+      const roomsData = await roomService.getRooms();
       setRooms(roomsData);
       
       // Initialize selected rooms with all room IDs if empty
