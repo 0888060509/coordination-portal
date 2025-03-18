@@ -2,6 +2,8 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 
 export interface LoadingSpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: "sm" | "md" | "lg";
@@ -73,20 +75,58 @@ export default LoadingSpinner;
 // Also export a component for content loading
 export const LoadingContent = ({
   className,
-  timeout = 10000, // 10 second timeout
+  timeout = 30000, // Increased default timeout to 30 seconds
+  onRetry,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & { timeout?: number }) => {
+}: React.HTMLAttributes<HTMLDivElement> & { 
+  timeout?: number,
+  onRetry?: () => void 
+}) => {
   const [showError, setShowError] = React.useState(false);
+  const [loadingTime, setLoadingTime] = React.useState(0);
 
   React.useEffect(() => {
+    const startTime = Date.now();
     const timer = setTimeout(() => setShowError(true), timeout);
-    return () => clearTimeout(timer);
+    
+    // Update loading time every second
+    const intervalTimer = setInterval(() => {
+      setLoadingTime(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    
+    return () => {
+      clearTimeout(timer);
+      clearInterval(intervalTimer);
+    };
   }, [timeout]);
 
   if (showError) {
     return (
-      <div className="text-center text-red-600 p-4">
-        Loading took too long. Please try refreshing the page.
+      <div className="flex flex-col items-center justify-center text-center p-4">
+        <div className="text-red-600 mb-2">
+          Loading took too long. Please try refreshing the page.
+        </div>
+        {onRetry ? (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-2 flex items-center gap-2"
+            onClick={onRetry}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Try Again
+          </Button>
+        ) : (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-2 flex items-center gap-2"
+            onClick={() => window.location.reload()}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh Page
+          </Button>
+        )}
       </div>
     );
   }
@@ -100,6 +140,11 @@ export const LoadingContent = ({
       {...props}
     >
       <LoadingSpinner size="md" showText />
+      {loadingTime > 10 && (
+        <div className="text-sm text-muted-foreground">
+          Still loading... ({loadingTime}s)
+        </div>
+      )}
     </div>
   );
 };

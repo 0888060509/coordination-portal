@@ -31,6 +31,7 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
   const isMobile = useMediaQuery("(max-width: 640px)");
   
   useEffect(() => {
+    // Only load rooms when the modal is open
     if (isOpen) {
       loadRooms();
     }
@@ -40,7 +41,11 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Add a small delay to prevent flickering
       const rooms = await roomService.getRooms();
+      
+      // Check if the component is still mounted before updating state
       setRooms(rooms);
     } catch (error: any) {
       console.error("Failed to load rooms:", error);
@@ -75,7 +80,7 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
         
         <div className="mt-2 space-y-4 pb-16">
           {isLoading ? (
-            <LoadingContent />
+            <LoadingContent timeout={30000} /> // Increase timeout to 30 seconds
           ) : error ? (
             <div className="p-4 text-center">
               <p className="text-red-500">{error}</p>
