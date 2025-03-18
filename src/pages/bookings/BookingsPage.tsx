@@ -5,10 +5,16 @@ import { useNavigate } from "react-router-dom";
 import BookingsList from "@/components/bookings/BookingsList";
 import { Button } from "@/components/ui/button";
 import { LoadingContent } from "@/components/ui/loading-spinner";
+import BookingModal from "@/components/bookings/BookingSheetModal";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const BookingsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     // Simulate loading time for initial render
@@ -19,12 +25,27 @@ const BookingsPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  const handleBookRoom = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to book a room",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+
+    // Open the booking modal directly instead of navigating
+    setIsBookModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">My Bookings</h1>
         <Button 
-          onClick={() => navigate("/rooms?booking=new")} 
+          onClick={handleBookRoom} 
           className="flex items-center gap-2"
         >
           <PlusCircle className="h-4 w-4" />
@@ -36,9 +57,15 @@ const BookingsPage = () => {
         <LoadingContent />
       ) : (
         <div className="space-y-6">
-          <BookingsList />
+          <BookingsList onBookRoom={handleBookRoom} />
         </div>
       )}
+
+      {/* Room Booking Modal */}
+      <BookingModal 
+        isOpen={isBookModalOpen} 
+        onClose={() => setIsBookModalOpen(false)} 
+      />
     </div>
   );
 };

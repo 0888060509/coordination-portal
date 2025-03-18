@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Users, MapPin } from 'lucide-react';
 import { RoomWithAmenities } from '@/types/room';
 import BookingModal from '@/components/bookings/BookingModal';
-import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -35,22 +34,27 @@ const RoomCard = ({ room, date, startTime, endTime, showBookingPrompt = false }:
   // Default placeholder image if none provided
   const imageUrl = room.image_url || 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80';
   
-  // If showBookingPrompt is true, highlight this card with a subtle animation
+  // Only show prompt on mount, not when showBookingPrompt changes after mount
   React.useEffect(() => {
+    let timer: number | undefined;
     if (showBookingPrompt) {
-      const timer = setTimeout(() => {
+      timer = window.setTimeout(() => {
         setIsBookingModalOpen(true);
       }, 500);
-      return () => clearTimeout(timer);
     }
-  }, [showBookingPrompt]);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
+  }, []); // Empty dependency array so it only runs once on mount
   
-  const handleViewDetails = () => {
+  const handleViewDetails = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent event bubbling to parent
     // Navigate to room details page
     navigate(`/rooms/${room.id}`);
   };
   
-  const handleBookRoom = () => {
+  const handleBookRoom = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent event bubbling to parent
     console.log("Book room clicked", { isAuthenticated, user });
     
     if (!isAuthenticated || !user) {
