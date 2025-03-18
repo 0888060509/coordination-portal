@@ -51,7 +51,7 @@ const App = () => {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<UpdatePasswordPage />} />
                 
-                {/* Protected Routes */}
+                {/* Protected Routes - All wrapped in the DashboardLayout */}
                 <Route 
                   element={
                     <ProtectedRoute>

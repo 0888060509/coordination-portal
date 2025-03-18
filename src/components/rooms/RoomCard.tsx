@@ -23,9 +23,10 @@ interface RoomCardProps {
   date: Date | null;
   startTime: string;
   endTime: string;
+  showBookingPrompt?: boolean;
 }
 
-const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
+const RoomCard = ({ room, date, startTime, endTime, showBookingPrompt = false }: RoomCardProps) => {
   const navigate = useNavigate();
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
@@ -33,6 +34,16 @@ const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
   
   // Default placeholder image if none provided
   const imageUrl = room.image_url || 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80';
+  
+  // If showBookingPrompt is true, highlight this card with a subtle animation
+  React.useEffect(() => {
+    if (showBookingPrompt) {
+      const timer = setTimeout(() => {
+        setIsBookingModalOpen(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [showBookingPrompt]);
   
   const handleViewDetails = () => {
     // Navigate to room details page
@@ -52,31 +63,21 @@ const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
       return;
     }
     
-    // Validate date and time selection
-    if (!date) {
-      toast({
-        title: "Date required",
-        description: "Please select a date for your booking",
-        variant: "destructive"
-      });
-      return;
-    }
+    // Use current date and time if not provided
+    const currentDate = new Date();
+    const currentHour = currentDate.getHours();
+    const nextHour = (currentHour + 1) % 24;
     
-    if (!startTime || !endTime) {
-      toast({
-        title: "Time required",
-        description: "Please select start and end times for your booking",
-        variant: "destructive"
-      });
-      return;
-    }
+    const bookingDate = date || currentDate;
+    const bookingStartTime = startTime || `${currentHour.toString().padStart(2, '0')}:00`;
+    const bookingEndTime = endTime || `${nextHour.toString().padStart(2, '0')}:00`;
     
     setIsBookingModalOpen(true);
   };
   
   return (
     <>
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+      <Card className={`overflow-hidden hover:shadow-lg transition-shadow duration-300 ${showBookingPrompt ? 'ring-2 ring-primary animate-pulse' : ''}`}>
         <div className="aspect-video w-full overflow-hidden">
           <img
             src={imageUrl}
@@ -151,8 +152,8 @@ const RoomCard = ({ room, date, startTime, endTime }: RoomCardProps) => {
           onClose={() => setIsBookingModalOpen(false)}
           room={room}
           initialDate={date || new Date()}
-          initialStartTime={startTime}
-          initialEndTime={endTime}
+          initialStartTime={startTime || `${new Date().getHours().toString().padStart(2, '0')}:00`}
+          initialEndTime={endTime || `${(new Date().getHours() + 1).toString().padStart(2, '0')}:00`}
         />
       )}
     </>
