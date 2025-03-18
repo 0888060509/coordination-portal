@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,36 +31,14 @@ import {
   Clock,
 } from "lucide-react";
 import { format } from "date-fns";
-
-// Mock room data - This would typically come from an API
-const roomsData = [
-  {
-    id: "1",
-    name: "Imagination Room",
-    capacity: 12,
-    location: "Floor 3, West Wing",
-    features: ["Video Conferencing", "Whiteboard", "Coffee Machine", "Wifi", "Natural Lighting"],
-    description: "A spacious room with panoramic city views, perfect for creative brainstorming sessions. The room is equipped with all the necessary technology for productive meetings, including a high-definition video conferencing system and digital whiteboard. The comfortable seating arrangement can be reconfigured for various meeting styles.",
-    status: "available",
-    imageUrl: "https://images.unsplash.com/photo-1517502884422-41eaead166d4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80",
-    upcomingBookings: [
-      {
-        id: "b1",
-        title: "Product Design Workshop",
-        organizer: "Sarah Johnson",
-        start: new Date(new Date().setHours(14, 0)),
-        end: new Date(new Date().setHours(16, 0)),
-      },
-      {
-        id: "b2",
-        title: "Q4 Planning",
-        organizer: "Michael Roberts",
-        start: new Date(new Date().setDate(new Date().getDate() + 1)),
-        end: new Date(new Date().setDate(new Date().getDate() + 1)),
-      },
-    ],
-  },
-];
+import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { roomService } from "@/services/roomService";
+import { bookingService } from "@/services/bookingService";
+import BookingModal from "@/components/bookings/BookingModal";
+import { RoomWithAmenities } from "@/types/room";
+import { Booking } from "@/types/booking";
+import { useAuth } from "@/context/AuthContext";
 
 // Feature icon mapping
 const featureIcons: Record<string, JSX.Element> = {
@@ -86,9 +65,52 @@ const statusColors: Record<string, string> = {
 const RoomDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
-  // Find room by id
-  const room = roomsData.find((r) => r.id === id);
+  // Query for room details
+  const { data: room, isLoading: isLoadingRoom } = useQuery({
+    queryKey: ["room", id],
+    queryFn: () => id ? roomService.getRoomById(id) : Promise.reject("No room ID provided"),
+    enabled: !!id
+  });
+
+  // Query for upcoming bookings for this room
+  const { data: bookings, isLoading: isLoadingBookings } = useQuery({
+    queryKey: ["roomBookings", id],
+    queryFn: () => {
+      if (!id) return Promise.reject("No room ID provided");
+      // Get bookings for next 7 days
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + 7);
+      return bookingService.getRoomBookings(id, startDate, endDate);
+    },
+    enabled: !!id
+  });
+
+  const handleBookRoom = () => {
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to book a room",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+    
+    setIsBookingModalOpen(true);
+  };
+
+  if (isLoadingRoom) {
+    return (
+      <div className="flex justify-center py-12">
+        <p>Loading room details...</p>
+      </div>
+    );
+  }
 
   if (!room) {
     return (
@@ -119,7 +141,7 @@ const RoomDetailPage = () => {
           <Card>
             <div className="aspect-video w-full overflow-hidden">
               <img
-                src={room.imageUrl}
+                src={room.image_url || "https://images.unsplash.com/photo-1517502884422-41eaead166d4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80"}
                 alt={room.name}
                 className="w-full h-full object-cover"
               />
@@ -133,8 +155,8 @@ const RoomDetailPage = () => {
                     {room.location}
                   </CardDescription>
                 </div>
-                <Badge className={statusColors[room.status]}>
-                  {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
+                <Badge className={statusColors['available']}>
+                  Available
                 </Badge>
               </div>
             </CardHeader>
@@ -142,21 +164,21 @@ const RoomDetailPage = () => {
               <div>
                 <h3 className="text-lg font-medium mb-2">Description</h3>
                 <p className="text-gray-700 dark:text-gray-300">
-                  {room.description}
+                  {room.description || "No description available"}
                 </p>
               </div>
 
               <div>
                 <h3 className="text-lg font-medium mb-2">Features & Amenities</h3>
                 <div className="flex flex-wrap gap-2">
-                  {room.features.map((feature, index) => (
+                  {room.amenities && room.amenities.map((amenity) => (
                     <Badge
-                      key={index}
+                      key={amenity.id}
                       variant="secondary"
                       className="flex items-center gap-1 py-1.5"
                     >
-                      {featureIcons[feature] || <Monitor className="h-4 w-4" />}
-                      {feature}
+                      {featureIcons[amenity.name] || <Monitor className="h-4 w-4" />}
+                      {amenity.name}
                     </Badge>
                   ))}
                 </div>
@@ -165,15 +187,10 @@ const RoomDetailPage = () => {
             <CardFooter>
               <Button
                 className="w-full bg-meeting-secondary hover:bg-teal-600"
-                disabled={room.status !== "available"}
-                onClick={() =>
-                  room.status === "available"
-                    ? navigate(`/bookings?roomId=${room.id}`)
-                    : null
-                }
+                onClick={handleBookRoom}
               >
                 <CalendarClock className="mr-2 h-4 w-4" />
-                {room.status === "available" ? "Book This Room" : "Unavailable"}
+                Book This Room
               </Button>
             </CardFooter>
           </Card>
@@ -186,17 +203,18 @@ const RoomDetailPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {room.upcomingBookings && room.upcomingBookings.length > 0 ? (
+              {isLoadingBookings ? (
+                <div className="text-center py-4">Loading bookings...</div>
+              ) : bookings && bookings.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Meeting</TableHead>
-                      <TableHead>Organizer</TableHead>
                       <TableHead>Date & Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {room.upcomingBookings.map((booking) => (
+                    {bookings.map((booking) => (
                       <TableRow
                         key={booking.id}
                         className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -205,11 +223,10 @@ const RoomDetailPage = () => {
                         <TableCell className="font-medium">
                           {booking.title}
                         </TableCell>
-                        <TableCell>{booking.organizer}</TableCell>
                         <TableCell>
                           <div className="flex items-center">
                             <Clock className="h-4 w-4 mr-1 text-gray-500" />
-                            {format(booking.start, "MMM d, h:mm a")}
+                            {format(new Date(booking.start_time), "MMM d, h:mm a")}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -248,18 +265,10 @@ const RoomDetailPage = () => {
               </div>
 
               <div className="flex items-center gap-2 pb-2 border-b">
-                <div
-                  className={`h-3 w-3 rounded-full ${
-                    room.status === "available"
-                      ? "bg-green-500"
-                      : room.status === "booked"
-                      ? "bg-red-500"
-                      : "bg-amber-500"
-                  }`}
-                />
+                <div className="h-3 w-3 rounded-full bg-green-500" />
                 <div>
                   <p className="text-sm text-gray-500">Current Status</p>
-                  <p className="font-medium capitalize">{room.status}</p>
+                  <p className="font-medium capitalize">Available</p>
                 </div>
               </div>
             </CardContent>
@@ -290,6 +299,17 @@ const RoomDetailPage = () => {
           </Card>
         </div>
       </div>
+
+      {isBookingModalOpen && (
+        <BookingModal
+          isOpen={isBookingModalOpen}
+          onClose={() => setIsBookingModalOpen(false)}
+          room={room}
+          initialDate={new Date()}
+          initialStartTime=""
+          initialEndTime=""
+        />
+      )}
     </div>
   );
 };
