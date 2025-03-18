@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/sheet";
 import { LoadingContent } from "@/components/ui/loading-spinner";
 import RoomCard from "@/components/rooms/RoomCard";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useMediaQuery("(max-width: 640px)");
   
   useEffect(() => {
     if (isOpen) {
@@ -62,12 +64,16 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
   
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-lg md:max-w-xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <SheetHeader>
+      <SheetContent 
+        side={isMobile ? "bottom" : "right"}
+        className={`${isMobile ? 'h-[85vh] max-h-[85vh]' : 'w-full sm:max-w-lg md:max-w-xl'} overflow-y-auto pb-10`} 
+        onClick={(e) => e.stopPropagation()}
+      >
+        <SheetHeader className="mb-4">
           <SheetTitle>Book a Room</SheetTitle>
         </SheetHeader>
         
-        <div className="mt-6 space-y-4">
+        <div className="mt-2 space-y-4">
           {isLoading ? (
             <LoadingContent />
           ) : error ? (
@@ -94,7 +100,7 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
                 <div 
                   key={room.id} 
                   onClick={(e) => handleCardClick(e, room)}
-                  className="cursor-pointer"
+                  className="cursor-pointer transition-transform hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <RoomCard
                     room={room}

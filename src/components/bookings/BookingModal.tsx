@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -46,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bookingService } from "@/services/bookingService";
 import { RoomWithAmenities } from "@/types/room";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -121,6 +123,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 640px)");
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -217,15 +220,19 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent 
+        className={`${isMobile ? 'w-[95%] max-h-[90vh] overflow-y-auto' : 'sm:max-w-[600px]'} p-4 sm:p-6`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <DialogHeader>
           <DialogTitle>Book {room.name}</DialogTitle>
+          <DialogDescription className="sr-only">Book this room by filling out the form</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
             {/* Room details summary */}
-            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-md">
+            <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-950 rounded-md">
               <p className="font-bold">{room.name}</p>
               <div className="flex flex-wrap gap-2 mt-2">
                 <div className="flex items-center">
@@ -315,47 +322,47 @@ const BookingModal: React.FC<BookingModalProps> = ({
               )}
             />
 
-            {/* Date picker */}
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className="w-full pl-3 text-left font-normal"
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className={`grid ${isMobile ? 'grid-cols-1 gap-4' : 'grid-cols-3 gap-4'}`}>
+              {/* Date picker */}
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className="w-full pl-3 text-left font-normal"
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Time range */}
-            <div className="grid grid-cols-2 gap-4">
+              {/* Time range */}
               <FormField
                 control={form.control}
                 name="startTime"
@@ -394,7 +401,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   control={form.control}
                   name="requiresVideoConferencing"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 sm:p-4">
                       <FormControl>
                         <Checkbox
                           checked={field.value}
@@ -418,7 +425,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   control={form.control}
                   name="requiresRefreshments"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 sm:p-4">
                       <FormControl>
                         <Checkbox
                           checked={field.value}
@@ -458,7 +465,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               />
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="mt-6 sm:mt-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline">
                   Cancel
