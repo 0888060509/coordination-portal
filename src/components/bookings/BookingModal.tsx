@@ -221,16 +221,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent 
-        className={`${isMobile ? 'w-[95%] max-h-[90vh] overflow-y-auto' : 'sm:max-w-[600px]'} p-4 sm:p-6`}
+        className={`${isMobile ? 'w-[95%] max-h-[85vh]' : 'sm:max-w-[600px] max-h-[90vh]'} p-4 sm:p-6 overflow-y-auto`}
         onClick={(e) => e.stopPropagation()}
       >
-        <DialogHeader>
+        <DialogHeader className="sticky top-0 bg-background z-10 pb-2">
           <DialogTitle>Book {room.name}</DialogTitle>
           <DialogDescription className="sr-only">Book this room by filling out the form</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
             {/* Room details summary */}
             <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-950 rounded-md">
               <p className="font-bold">{room.name}</p>
@@ -292,7 +292,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         <SelectValue placeholder="Select meeting type" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent position={isMobile ? "popper" : "item-aligned"}>
                       {meetingTypes.map((type) => (
                         <SelectItem key={type} value={type}>{type}</SelectItem>
                       ))}
@@ -346,7 +346,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent 
+                        className="w-auto p-0" 
+                        align="start"
+                        side={isMobile ? "bottom" : "bottom"}
+                        sideOffset={5}
+                      >
                         <Calendar
                           mode="single"
                           selected={field.value}
@@ -393,7 +398,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
             </div>
 
             {/* Special Requirements */}
-            <div className="space-y-4">
+            <div className="space-y-4 pt-2">
               <h3 className="text-sm font-medium">Special Requirements</h3>
               
               <div className="flex flex-col space-y-2">
@@ -465,7 +470,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               />
             </div>
 
-            <DialogFooter className="mt-6 sm:mt-4">
+            <DialogFooter className="sticky bottom-0 pt-4 mt-6 sm:mt-4 bg-background gap-2">
               <DialogClose asChild>
                 <Button type="button" variant="outline">
                   Cancel

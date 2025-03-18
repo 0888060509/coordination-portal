@@ -66,14 +66,14 @@ const BookingSheetModal = ({ isOpen, onClose }: BookingModalProps) => {
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent 
         side={isMobile ? "bottom" : "right"}
-        className={`${isMobile ? 'h-[85vh] max-h-[85vh]' : 'w-full sm:max-w-lg md:max-w-xl'} overflow-y-auto pb-10`} 
+        className={`${isMobile ? 'h-[80vh] rounded-t-xl' : 'w-full sm:max-w-lg md:max-w-xl'} p-4 overflow-y-auto`} 
         onClick={(e) => e.stopPropagation()}
       >
-        <SheetHeader className="mb-4">
+        <SheetHeader className="mb-4 sticky top-0 z-10 bg-background pt-1">
           <SheetTitle>Book a Room</SheetTitle>
         </SheetHeader>
         
-        <div className="mt-2 space-y-4">
+        <div className="mt-2 space-y-4 pb-16">
           {isLoading ? (
             <LoadingContent />
           ) : error ? (
