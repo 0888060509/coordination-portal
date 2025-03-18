@@ -8,6 +8,8 @@ import { LoadingContent } from "@/components/ui/loading-spinner";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import BookingCard from "./BookingCard";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 interface BookingsListProps {
   onBookRoom: () => void;
@@ -18,15 +20,21 @@ const BookingsList = ({ onBookRoom }: BookingsListProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
-    loadBookings();
-  }, []);
+    if (user) {
+      loadBookings();
+    }
+  }, [user]);
 
   const loadBookings = async () => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Log to debug the user state
+      console.info("Loading bookings for user:", user?.id);
       
       const bookings = await bookingService.getUserBookings();
       console.info("Bookings loaded:", bookings);
@@ -64,7 +72,7 @@ const BookingsList = ({ onBookRoom }: BookingsListProps) => {
   const today = format(new Date(), 'yyyy-MM-dd');
   const hasBookingsToday = groupedBookings[today] && groupedBookings[today].length > 0;
 
-  if (isLoading) return <LoadingContent />;
+  if (isLoading) return <LoadingContent timeout={30000} />;
 
   if (error) {
     return (

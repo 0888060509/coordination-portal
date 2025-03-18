@@ -25,14 +25,38 @@ export const bookingService = {
 
       console.log("Fetching bookings for user:", userId);
 
-      // First, get all bookings for the current user
+      // First, get all bookings for the current user with room details
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
-          *,
-          rooms (*)
+          id,
+          room_id,
+          user_id,
+          title,
+          description,
+          start_time,
+          end_time,
+          meeting_type,
+          special_requests,
+          status,
+          cancellation_reason,
+          created_at,
+          updated_at,
+          recurring_pattern_id,
+          rooms (
+            id,
+            name,
+            capacity,
+            location,
+            floor,
+            room_number,
+            description,
+            image_url,
+            is_active
+          )
         `)
         .eq('user_id', userId)
+        .eq('status', 'confirmed')
         .order('start_time', { ascending: true });
 
       if (bookingsError) {
@@ -74,12 +98,14 @@ export const bookingService = {
       console.log("Profile data:", profile);
 
       // Format the data to match our BookingWithDetails type
-      const bookings = bookingsData.map(booking => ({
-        ...booking,
-        room: booking.rooms,
-        user: profile,
-        rooms: undefined,
-      })) as unknown as BookingWithDetails[];
+      const bookings = bookingsData.map(booking => {
+        return {
+          ...booking,
+          room: booking.rooms,
+          user: profile,
+          rooms: undefined,
+        };
+      }) as unknown as BookingWithDetails[];
 
       console.log("Processed bookings data:", bookings);
       

@@ -17,13 +17,16 @@ const BookingsPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate loading time for initial render
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    // Ensure authentication is initialized before rendering
+    if (user || !isAuthenticated) {
+      // Either user is loaded or we know they're not authenticated
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, isAuthenticated]);
 
   const handleBookRoom = () => {
     if (!isAuthenticated) {
@@ -57,7 +60,7 @@ const BookingsPage = () => {
       </div>
       
       {isLoading ? (
-        <LoadingContent />
+        <LoadingContent timeout={15000} />
       ) : (
         <div className="space-y-6">
           <BookingsList onBookRoom={handleBookRoom} />
