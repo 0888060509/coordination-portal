@@ -1,3 +1,4 @@
+
 import { supabase, handleSupabaseError } from '@/integrations/supabase/client';
 import { Booking, BookingWithDetails, CreateBookingData } from '@/types/booking';
 import { toast } from '@/hooks/use-toast';
@@ -52,18 +53,31 @@ export const bookingService = {
         .eq('id', userId)
         .single();
 
-      if (profileError) {
+      if (profileError && profileError.code !== 'PGRST116') { // Ignore empty result error
         console.error("Error fetching user profile:", profileError);
         throw profileError;
       }
 
-      console.log("Profile data from Supabase:", profileData);
+      const profile = profileData || {
+        id: userId,
+        first_name: '',
+        last_name: '',
+        email: userData.user?.email || '',
+        avatar_url: null,
+        department: null,
+        position: null,
+        is_admin: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log("Profile data:", profile);
 
       // Format the data to match our BookingWithDetails type
       const bookings = bookingsData.map(booking => ({
         ...booking,
         room: booking.rooms,
-        user: profileData,
+        user: profile,
         rooms: undefined,
       })) as unknown as BookingWithDetails[];
 

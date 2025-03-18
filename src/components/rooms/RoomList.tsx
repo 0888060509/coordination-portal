@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -49,7 +49,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 
-// Generate time options for select inputs (8 AM to 9 PM)
 const timeOptions = Array.from({ length: 14 }, (_, i) => {
   const hour = i + 8;
   const formattedHour = hour.toString().padStart(2, '0');
@@ -74,7 +73,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   
-  // Filter states
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
@@ -84,21 +82,17 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
   const [endTime, setEndTime] = useState<string>('10:00');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  // Load rooms and filter options
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Fetch all amenities for filter
         const amenitiesData = await roomService.getAmenities();
         setAmenities(amenitiesData);
         
-        // Fetch all locations for filter
         const locationsData = await roomService.getLocations();
         setLocations(locationsData);
         
-        // Fetch rooms with initial filters
         const filters: RoomFilterOptions = {
           date: selectedDate || undefined,
           startTime,
@@ -119,7 +113,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
     fetchData();
   }, [selectedDate, startTime, endTime]);
 
-  // Apply filters when filter criteria change
   const applyFilters = async () => {
     try {
       setLoading(true);
@@ -144,15 +137,16 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
     }
   };
 
-  // Reset all filters
   const resetFilters = () => {
     setSearchQuery('');
     setSelectedAmenities([]);
     setSelectedLocation('');
     setCapacity(undefined);
-    // Keep date and time as they are
+    setSelectedDate(new Date());
+    setStartTime('09:00');
+    setEndTime('10:00');
+    setIsCalendarOpen(false);
     
-    // Re-fetch rooms with just date/time filters
     const fetchRooms = async () => {
       try {
         setLoading(true);
@@ -196,7 +190,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
           </p>
         </div>
         
-        {/* Mobile filter drawer trigger */}
         <div className="flex gap-2 lg:hidden w-full">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -222,7 +215,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
                 </DrawerDescription>
               </DrawerHeader>
               <div className="px-4 py-2 space-y-4">
-                {/* Date picker */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Date</label>
                   <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -249,7 +241,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
                   </Popover>
                 </div>
                 
-                {/* Time range */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Start Time</label>
                   <Select value={startTime} onValueChange={setStartTime}>
@@ -282,7 +273,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
                   </Select>
                 </div>
                 
-                {/* Location filter */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Location</label>
                   <Select value={selectedLocation} onValueChange={setSelectedLocation}>
@@ -300,7 +290,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
                   </Select>
                 </div>
                 
-                {/* Capacity filter */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Minimum Capacity</label>
                   <Input
@@ -312,7 +301,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
                   />
                 </div>
                 
-                {/* Amenities filter */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Amenities</label>
                   <div className="space-y-2">
@@ -351,7 +339,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
         </div>
       </div>
 
-      {/* Desktop filters */}
       <div className="hidden lg:grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
         <div className="space-y-1">
           <label className="text-sm font-medium">Date</label>
@@ -460,7 +447,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
             Apply Filters
           </Button>
           
-          {/* Amenities filter popover */}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline">
@@ -498,21 +484,18 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
         </div>
       </div>
       
-      {/* Error message */}
       {error && (
         <div className="p-4 mb-4 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 rounded-md">
           {error}
         </div>
       )}
       
-      {/* Loading state */}
       {loading ? (
         <div className="flex justify-center items-center h-48">
           <p>Loading rooms...</p>
         </div>
       ) : (
         <>
-          {/* Room count */}
           <div className="mb-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Found {filteredRooms.length} {filteredRooms.length === 1 ? 'room' : 'rooms'} available
@@ -521,7 +504,6 @@ const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
             </p>
           </div>
           
-          {/* Room grid */}
           {filteredRooms.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredRooms.map((room) => (

@@ -5,7 +5,7 @@ import {
   Clock, 
   MapPin, 
   MoreVertical, 
-  AlertCircle
+  AlertCircle 
 } from "lucide-react";
 import { format, isPast, isFuture, isToday } from "date-fns";
 
@@ -40,11 +40,19 @@ const BookingsList = () => {
   const loadBookings = async () => {
     try {
       setLoading(true);
+      console.log("Loading bookings...");
       const bookingsData = await bookingService.getUserBookings();
+      console.log("Bookings loaded:", bookingsData);
       setBookings(bookingsData);
       setError(null);
     } catch (err: any) {
+      console.error("Error loading bookings:", err);
       setError(err.message || "Failed to load bookings");
+      toast({
+        title: "Error loading bookings",
+        description: err.message || "Could not load your bookings. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -217,8 +225,6 @@ const BookingsList = () => {
   
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">My Bookings</h1>
-      
       {error && (
         <div className="p-4 mb-4 bg-destructive/10 text-destructive rounded-md flex items-center">
           <AlertCircle className="h-5 w-5 mr-2" />
@@ -233,62 +239,88 @@ const BookingsList = () => {
           <Skeleton className="h-[200px] w-full rounded-md" />
         </div>
       ) : (
-        <Tabs defaultValue="today">
-          <TabsList className="mb-4">
-            <TabsTrigger value="today">
-              Today ({todayBookings.length})
-            </TabsTrigger>
-            <TabsTrigger value="upcoming">
-              Upcoming ({upcomingBookings.length})
-            </TabsTrigger>
-            <TabsTrigger value="past">
-              Past ({pastBookings.length})
-            </TabsTrigger>
-            <TabsTrigger value="cancelled">
-              Cancelled ({cancelledBookings.length})
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="today">
-            {todayBookings.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {todayBookings.map(renderBookingCard)}
-              </div>
-            ) : (
-              renderEmptyState("You have no bookings for today.", true)
-            )}
-          </TabsContent>
-          
-          <TabsContent value="upcoming">
-            {upcomingBookings.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {upcomingBookings.map(renderBookingCard)}
-              </div>
-            ) : (
-              renderEmptyState("You have no upcoming bookings.", true)
-            )}
-          </TabsContent>
-          
-          <TabsContent value="past">
-            {pastBookings.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {pastBookings.map(renderBookingCard)}
-              </div>
-            ) : (
-              renderEmptyState("You have no past bookings.")
-            )}
-          </TabsContent>
-          
-          <TabsContent value="cancelled">
-            {cancelledBookings.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {cancelledBookings.map(renderBookingCard)}
-              </div>
-            ) : (
-              renderEmptyState("You have no cancelled bookings.")
-            )}
-          </TabsContent>
-        </Tabs>
+        <>
+          {bookings.length === 0 ? (
+            <div className="text-center p-8 bg-muted/40 rounded-lg">
+              <h3 className="text-xl font-medium mb-2">No bookings found</h3>
+              <p className="text-muted-foreground mb-4">
+                You haven't made any room bookings yet.
+              </p>
+              <Button onClick={() => navigate('/rooms?booking=new')}>
+                Book a Room
+              </Button>
+            </div>
+          ) : (
+            <Tabs defaultValue="today">
+              <TabsList className="mb-4">
+                <TabsTrigger value="today">
+                  Today ({bookings.filter(b => 
+                    b.status === "confirmed" && isToday(new Date(b.start_time))
+                  ).length})
+                </TabsTrigger>
+                <TabsTrigger value="upcoming">
+                  Upcoming ({bookings.filter(b => 
+                    b.status === "confirmed" && 
+                    isFuture(new Date(b.start_time)) &&
+                    !isToday(new Date(b.start_time))
+                  ).length})
+                </TabsTrigger>
+                <TabsTrigger value="past">
+                  Past ({bookings.filter(b => 
+                    (b.status === "completed" || b.status === "confirmed") && 
+                    isPast(new Date(b.end_time)) && 
+                    !isToday(new Date(b.start_time))
+                  ).length})
+                </TabsTrigger>
+                <TabsTrigger value="cancelled">
+                  Cancelled ({bookings.filter(b => 
+                    b.status === "cancelled"
+                  ).length})
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="today">
+                {todayBookings.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {todayBookings.map(renderBookingCard)}
+                  </div>
+                ) : (
+                  renderEmptyState("You have no bookings for today.", true)
+                )}
+              </TabsContent>
+              
+              <TabsContent value="upcoming">
+                {upcomingBookings.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {upcomingBookings.map(renderBookingCard)}
+                  </div>
+                ) : (
+                  renderEmptyState("You have no upcoming bookings.", true)
+                )}
+              </TabsContent>
+              
+              <TabsContent value="past">
+                {pastBookings.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {pastBookings.map(renderBookingCard)}
+                  </div>
+                ) : (
+                  renderEmptyState("You have no past bookings.")
+                )}
+              </TabsContent>
+              
+              <TabsContent value="cancelled">
+                {cancelledBookings.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {cancelledBookings.map(renderBookingCard)}
+                  </div>
+                ) : (
+                  renderEmptyState("You have no cancelled bookings.")
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+        </>
       )}
       
       {selectedBooking && (
