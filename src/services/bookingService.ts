@@ -2,6 +2,7 @@
 import { supabase, handleSupabaseError } from '@/integrations/supabase/client';
 import { Booking, BookingWithDetails, CreateBookingData } from '@/types/booking';
 import { toast } from '@/hooks/use-toast';
+import { differenceInMinutes } from 'date-fns';
 
 export const bookingService = {
   // Get all bookings for the current user
@@ -179,6 +180,16 @@ export const bookingService = {
     try {
       console.log("Creating new booking:", bookingData);
       
+      // Validate minimum 30-minute duration
+      const durationInMinutes = differenceInMinutes(
+        bookingData.end_time,
+        bookingData.start_time
+      );
+      
+      if (durationInMinutes < 30) {
+        throw new Error('Booking duration must be at least 30 minutes');
+      }
+      
       // Prepare booking data with all fields
       const booking = {
         room_id: bookingData.room_id,
@@ -272,8 +283,17 @@ export const bookingService = {
     try {
       console.log("Updating booking:", id, bookingData);
       
-      // If updating times, check availability first
+      // If updating times, validate 30-minute minimum duration
       if (bookingData.start_time && bookingData.end_time) {
+        const startTime = new Date(bookingData.start_time);
+        const endTime = new Date(bookingData.end_time);
+        const durationInMinutes = differenceInMinutes(endTime, startTime);
+        
+        if (durationInMinutes < 30) {
+          throw new Error('Booking duration must be at least 30 minutes');
+        }
+        
+        // Check availability
         console.log("Checking availability for updated time slot");
         
         const { data: isAvailable, error: availabilityError } = await supabase.rpc(

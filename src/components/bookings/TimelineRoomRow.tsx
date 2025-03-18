@@ -2,20 +2,33 @@
 import { useRef, useState } from "react";
 import { BookingWithDetails } from "@/types/booking";
 import { RoomWithAmenities } from "@/types/room";
-import { parseISO, format } from "date-fns";
+import { parseISO, format, addMinutes } from "date-fns";
 import { cn } from "@/lib/utils";
 import BookingDetailsModal from "./BookingDetailsModal";
+import BookingModal from "./BookingModal";
 
 interface TimelineRoomRowProps {
   room: RoomWithAmenities;
   timeSlots: number[];
   bookings: BookingWithDetails[];
+  selectedDate: Date;
+  onTimeBlockClick?: (room: RoomWithAmenities, startTime: Date, endTime: Date) => void;
 }
 
-const TimelineRoomRow = ({ room, timeSlots, bookings }: TimelineRoomRowProps) => {
+const TimelineRoomRow = ({ 
+  room, 
+  timeSlots, 
+  bookings, 
+  selectedDate,
+  onTimeBlockClick 
+}: TimelineRoomRowProps) => {
   const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [selectedStartTime, setSelectedStartTime] = useState<Date | null>(null);
+  const [selectedEndTime, setSelectedEndTime] = useState<Date | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   const getBookingPosition = (booking: BookingWithDetails) => {
     const startTime = parseISO(booking.start_time);
@@ -42,6 +55,41 @@ const TimelineRoomRow = ({ room, timeSlots, bookings }: TimelineRoomRowProps) =>
     setIsDetailsModalOpen(false);
   };
 
+  const handleTimeBlockClick = (hourIndex: number) => {
+    // Convert hour index to date
+    const startTime = new Date(selectedDate);
+    startTime.setHours(timeSlots[hourIndex]);
+    startTime.setMinutes(0);
+    startTime.setSeconds(0);
+    
+    // End time is 30 minutes later (minimum duration)
+    const endTime = addMinutes(startTime, 30);
+    
+    // Check if the time block is available (no booking overlaps)
+    const isOverlapping = bookings.some(booking => {
+      const bookingStart = parseISO(booking.start_time);
+      const bookingEnd = parseISO(booking.end_time);
+      
+      return (
+        (startTime >= bookingStart && startTime < bookingEnd) || 
+        (endTime > bookingStart && endTime <= bookingEnd) ||
+        (startTime <= bookingStart && endTime >= bookingEnd)
+      );
+    });
+    
+    if (!isOverlapping) {
+      setSelectedStartTime(startTime);
+      setSelectedEndTime(endTime);
+      setIsBookingModalOpen(true);
+    }
+  };
+
+  const closeBookingModal = () => {
+    setIsBookingModalOpen(false);
+    setSelectedStartTime(null);
+    setSelectedEndTime(null);
+  };
+
   return (
     <>
       <div 
@@ -60,8 +108,12 @@ const TimelineRoomRow = ({ room, timeSlots, bookings }: TimelineRoomRowProps) =>
         {/* Timeline grid */}
         <div className="flex-1 flex relative">
           {/* Time slot columns */}
-          {timeSlots.map(hour => (
-            <div key={hour} className="w-24 min-w-24 border-r h-full"></div>
+          {timeSlots.map((hour, index) => (
+            <div 
+              key={hour} 
+              className="w-24 min-w-24 border-r h-full cursor-pointer hover:bg-blue-50"
+              onClick={() => handleTimeBlockClick(index)}
+            ></div>
           ))}
           
           {/* Booking blocks */}
@@ -89,6 +141,18 @@ const TimelineRoomRow = ({ room, timeSlots, bookings }: TimelineRoomRowProps) =>
           isOpen={isDetailsModalOpen}
           onClose={() => setIsDetailsModalOpen(false)}
           onCancelBooking={handleCancelBooking}
+        />
+      )}
+
+      {/* New booking modal */}
+      {selectedStartTime && selectedEndTime && (
+        <BookingModal
+          isOpen={isBookingModalOpen}
+          onClose={closeBookingModal}
+          room={room}
+          initialDate={selectedDate}
+          initialStartTime={format(selectedStartTime, 'HH:mm')}
+          initialEndTime={format(selectedEndTime, 'HH:mm')}
         />
       )}
     </>

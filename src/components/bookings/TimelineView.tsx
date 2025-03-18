@@ -4,14 +4,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoadingContent } from "@/components/ui/loading-spinner";
-import { FilterIcon } from "lucide-react";
+import { FilterIcon, Info } from "lucide-react";
 import { bookingService } from "@/services/bookingService";
 import { roomService } from "@/services/roomService";
 import { BookingWithDetails } from "@/types/booking";
 import { RoomWithAmenities } from "@/types/room";
-import { format, parseISO, isSameDay } from "date-fns";
+import { format, parseISO, isSameDay, addMinutes } from "date-fns";
 import { cn } from "@/lib/utils";
 import TimelineRoomRow from "./TimelineRoomRow";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface TimelineViewProps {
   selectedDate: Date;
@@ -199,8 +200,21 @@ const TimelineView = ({ selectedDate }: TimelineViewProps) => {
           {/* Timeline header */}
           <div className="sticky top-0 bg-background z-10">
             <div className="h-16 border-b flex">
-              <div className="w-64 min-w-64 p-4 border-r font-medium">
-                Rooms
+              <div className="w-64 min-w-64 p-4 border-r font-medium flex items-center justify-between">
+                <span>Rooms</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <Info className="h-4 w-4" />
+                        <span className="sr-only">Booking instructions</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p>Click on an empty time slot to book a room. Minimum booking duration is 30 minutes.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <div className="flex-1 flex">
                 {timeSlots.map(hour => (
@@ -223,6 +237,7 @@ const TimelineView = ({ selectedDate }: TimelineViewProps) => {
                 room={room}
                 timeSlots={timeSlots}
                 bookings={bookings.filter(b => b.room_id === room.id && isSameDay(parseISO(b.start_time), selectedDate))}
+                selectedDate={selectedDate}
               />
             ))}
             
@@ -239,8 +254,8 @@ const TimelineView = ({ selectedDate }: TimelineViewProps) => {
         </div>
       </div>
       
-      {/* Room status legend */}
-      <div className="p-3 border-t flex items-center gap-6 text-sm">
+      {/* Room status legend and booking info */}
+      <div className="p-3 border-t flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         <span className="font-medium">Room Status:</span>
         <div className="flex items-center gap-1">
           <div className="h-3 w-3 rounded-full bg-green-500" />
@@ -253,6 +268,11 @@ const TimelineView = ({ selectedDate }: TimelineViewProps) => {
         <div className="flex items-center gap-1">
           <div className="h-3 w-3 rounded-full bg-red-500" />
           <span>Fully Booked</span>
+        </div>
+        <div className="h-4 w-px bg-gray-300 mx-2" />
+        <div className="flex items-center gap-1">
+          <Info className="h-3 w-3 text-blue-500" />
+          <span>Click on timeline to book (30 min minimum)</span>
         </div>
       </div>
     </div>

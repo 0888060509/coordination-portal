@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
-import { format, setHours, setMinutes } from "date-fns";
+import { format, setHours, setMinutes, differenceInMinutes } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { 
   Popover, 
@@ -42,7 +42,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Clock, Users, Video, Coffee } from "lucide-react";
+import { CalendarIcon, Clock, Users, Video, Coffee, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bookingService } from "@/services/bookingService";
@@ -107,6 +107,14 @@ const bookingSchema = z.object({
 }, {
   message: "Start time cannot be in the past",
   path: ['startTime'],
+}).refine((data) => {
+  const startDateTime = parseTimeString(data.startTime, data.date);
+  const endDateTime = parseTimeString(data.endTime, data.date);
+  const durationInMinutes = differenceInMinutes(endDateTime, startDateTime);
+  return durationInMinutes >= 30;
+}, {
+  message: "Meeting duration must be at least 30 minutes",
+  path: ['endTime'],
 });
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
@@ -124,6 +132,23 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isMobile = useMediaQuery("(max-width: 640px)");
+
+  // Check if initial times meet minimum duration requirement
+  useEffect(() => {
+    if (initialStartTime && initialEndTime) {
+      const start = parseTimeString(initialStartTime, initialDate);
+      const end = parseTimeString(initialEndTime, initialDate);
+      const duration = differenceInMinutes(end, start);
+      
+      // If duration is less than 30 minutes, add 30 minutes to the end time
+      if (duration < 30) {
+        const adjustedEnd = new Date(start);
+        adjustedEnd.setMinutes(start.getMinutes() + 30);
+        const adjustedEndTime = format(adjustedEnd, 'HH:mm');
+        form.setValue('endTime', adjustedEndTime);
+      }
+    }
+  }, [initialStartTime, initialEndTime, initialDate]);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -157,6 +182,26 @@ const BookingModal: React.FC<BookingModalProps> = ({
     }
   }, [isOpen, form, initialDate, initialStartTime, initialEndTime]);
 
+  // Check duration when start time or end time changes
+  const watchStartTime = form.watch('startTime');
+  const watchEndTime = form.watch('endTime');
+  const watchDate = form.watch('date');
+
+  useEffect(() => {
+    if (watchStartTime && watchEndTime && watchDate) {
+      const startDateTime = parseTimeString(watchStartTime, watchDate);
+      const endDateTime = parseTimeString(watchEndTime, watchDate);
+      const durationInMinutes = differenceInMinutes(endDateTime, startDateTime);
+      
+      if (durationInMinutes < 30 && durationInMinutes > 0) {
+        // Set end time to start time + 30 minutes
+        const newEndTime = new Date(startDateTime);
+        newEndTime.setMinutes(startDateTime.getMinutes() + 30);
+        form.setValue('endTime', format(newEndTime, 'HH:mm'));
+      }
+    }
+  }, [watchStartTime, watchDate, form]);
+
   const onSubmit = async (data: BookingFormValues) => {
     if (!user) {
       toast({
@@ -173,6 +218,17 @@ const BookingModal: React.FC<BookingModalProps> = ({
       // Create start and end date objects
       const startDateTime = parseTimeString(data.startTime, data.date);
       const endDateTime = parseTimeString(data.endTime, data.date);
+      
+      // Validate minimum duration
+      const durationInMinutes = differenceInMinutes(endDateTime, startDateTime);
+      if (durationInMinutes < 30) {
+        toast({
+          variant: "destructive",
+          title: "Invalid meeting duration",
+          description: "Meeting duration must be at least 30 minutes",
+        });
+        return;
+      }
 
       // Prepare special requests
       let specialRequests = data.specialRequests || '';
@@ -213,10 +269,32 @@ const BookingModal: React.FC<BookingModalProps> = ({
     }
   };
 
-  // Watch date and time values for summary display
-  const watchDate = form.watch('date');
-  const watchStartTime = form.watch('startTime');
-  const watchEndTime = form.watch('endTime');
+  // Duration message
+  const getDurationMessage = () => {
+    if (watchStartTime && watchEndTime && watchDate) {
+      const startDateTime = parseTimeString(watchStartTime, watchDate);
+      const endDateTime = parseTimeString(watchEndTime, watchDate);
+      const durationInMinutes = differenceInMinutes(endDateTime, startDateTime);
+      
+      if (durationInMinutes < 30) {
+        return (
+          <div className="flex items-center mt-1 text-destructive text-sm">
+            <AlertCircle className="h-4 w-4 mr-1" />
+            Meeting must be at least 30 minutes
+          </div>
+        );
+      }
+      
+      const hours = Math.floor(durationInMinutes / 60);
+      const minutes = durationInMinutes % 60;
+      return (
+        <div className="mt-1 text-sm text-muted-foreground">
+          Duration: {hours > 0 ? `${hours}h ` : ''}{minutes > 0 ? `${minutes}m` : ''}
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -248,8 +326,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   </span>
                 </div>
               </div>
+              {getDurationMessage()}
               <div className="flex flex-wrap gap-2 mt-2">
-                {room.amenities.map((amenity) => (
+                {room.amenities?.map((amenity) => (
                   <Badge
                     key={amenity.id}
                     variant="outline"
