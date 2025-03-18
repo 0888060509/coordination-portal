@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { roomService, RoomFilterOptions } from '@/services/roomService';
 import { RoomWithAmenities, Amenity } from '@/types/room';
+import RoomCard from './RoomCard';
 
 import {
   Popover,
@@ -60,7 +61,11 @@ const timeOptions = Array.from({ length: 14 }, (_, i) => {
   };
 });
 
-const RoomList = () => {
+interface RoomListProps {
+  showBookingPrompt?: boolean;
+}
+
+const RoomList = ({ showBookingPrompt = false }: RoomListProps) => {
   const navigate = useNavigate();
   const [rooms, setRooms] = useState<RoomWithAmenities[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<RoomWithAmenities[]>([]);
@@ -520,74 +525,14 @@ const RoomList = () => {
           {filteredRooms.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredRooms.map((room) => (
-                <Card key={room.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                  {room.image_url ? (
-                    <div className="aspect-video w-full overflow-hidden">
-                      <img
-                        src={room.image_url}
-                        alt={room.name}
-                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                      />
-                    </div>
-                  ) : (
-                    <div className="aspect-video w-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                      <p className="text-gray-500 dark:text-gray-400">No image available</p>
-                    </div>
-                  )}
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-xl">{room.name}</CardTitle>
-                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                        Available
-                      </Badge>
-                    </div>
-                    <CardDescription>{room.location}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      <Users className="h-4 w-4" />
-                      <span>Capacity: {room.capacity} people</span>
-                    </div>
-                    {room.description && (
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                        {room.description}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                      {room.amenities.slice(0, 3).map((amenity) => (
-                        <Badge
-                          key={amenity.id}
-                          variant="outline"
-                          className="flex items-center gap-1 text-xs"
-                        >
-                          {amenity.name}
-                        </Badge>
-                      ))}
-                      {room.amenities.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{room.amenities.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <div className="flex gap-2 w-full">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => navigate(`/rooms/${room.id}`)}
-                      >
-                        Details
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        onClick={() => navigate(`/bookings?roomId=${room.id}&date=${selectedDate?.toISOString()}&startTime=${startTime}&endTime=${endTime}`)}
-                      >
-                        Book
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
+                <RoomCard 
+                  key={room.id} 
+                  room={room} 
+                  date={selectedDate}
+                  startTime={startTime}
+                  endTime={endTime}
+                  showBookingPrompt={showBookingPrompt}
+                />
               ))}
             </div>
           ) : (
